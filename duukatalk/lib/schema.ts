@@ -7,6 +7,7 @@ export interface Transaction {
   paymentType: "cash" | "credit";
   dueDate: string | null;
   timestamp: string;
+  totalAmount: number;
 }
 
 /**
@@ -194,5 +195,6 @@ export function toTransaction(
     paymentType: fields.paymentType,
     dueDate: fields.dueDate,
     timestamp,
+    totalAmount: fields.quantity * fields.unitPrice,
   };
 }
