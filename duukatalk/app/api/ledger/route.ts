@@ -20,7 +20,6 @@ const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 export async function GET(request: NextRequest) {
   try {
-    // Get the logged-in vendor ID from the authentication cookie.
     const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
 
     if (!vendorId) {
@@ -32,7 +31,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch only transactions belonging to this vendor.
     const transactionsQuery = query(
       collection(db, "transactions"),
       where("vendor_id", "==", vendorId)
@@ -40,7 +38,6 @@ export async function GET(request: NextRequest) {
 
     const snapshot = await getDocs(transactionsQuery);
 
-    // Always use the actual Firestore document ID as "id".
     const transactions = snapshot.docs.map((docSnap) => ({
       ...docSnap.data(),
       id: docSnap.id,
@@ -61,7 +58,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Get the logged-in vendor ID.
     const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
 
     if (!vendorId) {
@@ -88,7 +84,6 @@ export async function POST(request: NextRequest) {
     };
 
     const customer = (body.customer ?? body.customer_name)?.trim();
-    // Scoped by vendor to match the key updateCustomerCredit writes to.
     const customerKey = `${vendorId}_${normalizeCustomerName(customer)}`;
     const item = body.item?.trim();
     const amount = Number(body.amount ?? body.total_amount);
@@ -156,6 +151,7 @@ export async function POST(request: NextRequest) {
             ? (body.dueDate ?? null)
             : null,
         timestamp,
+        totalAmount: 1 * amount,
       },
       "manual entry",
       transactionId,
