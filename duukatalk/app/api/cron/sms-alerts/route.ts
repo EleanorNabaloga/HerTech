@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dispatchVendorAlertSms } from "@/lib/dispatch-vendor-alerts";
+import { Language } from "@/lib/i18n";
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const result = await dispatchVendorAlertSms("en", undefined, undefined);
+    const result = await dispatchVendorAlertSms("en" as Language, undefined, undefined);
     console.log("Scheduled overdue-debt SMS sweep:", result);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
