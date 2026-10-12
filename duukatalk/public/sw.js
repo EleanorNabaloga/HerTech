@@ -1,4 +1,4 @@
-const CACHE_NAME = "duukatalk-shell-v1";
+const CACHE_NAME = "duukatalk-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -32,6 +32,22 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match(request)),
+    );
+    return;
+  }
+
+  // Network-first for page navigations, so users always get fresh
+  // HTML (correct language, correct auth state) when online, and only
+  // fall back to the cached shell when genuinely offline.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
     );
     return;
   }

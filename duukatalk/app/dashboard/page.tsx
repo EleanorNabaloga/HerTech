@@ -234,6 +234,12 @@ export default function DuukaTalkApp() {
   const [settingsMessage, setSettingsMessage] = useState('');
   const [reportNow] = useState(() => Date.now());
 
+  // ✅ Offline / connectivity state
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [queuedCount, setQueuedCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const syncingRef = useRef(false);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
 
@@ -298,17 +304,10 @@ export default function DuukaTalkApp() {
   const activeStreamRef = useRef<MediaStream | null>(null);
 
   // --- VOICE QUESTION REFS ---
-const questionMediaRecorderRef =
-  useRef<MediaRecorder | null>(null);
-
-const questionAudioChunksRef =
-  useRef<Blob[]>([]);
-
-const questionStreamRef =
-  useRef<MediaStream | null>(null);
-
-const questionAudioRef =
-  useRef<HTMLAudioElement | null>(null);
+  const questionMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const questionAudioChunksRef = useRef<Blob[]>([]);
+  const questionStreamRef = useRef<MediaStream | null>(null);
+  const questionAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // --- LEDGER STATE ---
 
@@ -318,23 +317,12 @@ const questionAudioRef =
 
   const [searchQuery, setSearchQuery] = useState('');
   // --- VOICE QUESTION STATE ---
-const [isQuestionRecording, setIsQuestionRecording] =
-  useState<boolean>(false);
-
-const [isQuestionProcessing, setIsQuestionProcessing] =
-  useState<boolean>(false);
-
-const [isQuestionSpeaking, setIsQuestionSpeaking] =
-  useState<boolean>(false);
-
-const [questionTranscript, setQuestionTranscript] =
-  useState<string>('');
-
-const [questionAnswer, setQuestionAnswer] =
-  useState<string>('');
-
-const [questionError, setQuestionError] =
-  useState<string>('');
+  const [isQuestionRecording, setIsQuestionRecording] = useState<boolean>(false);
+  const [isQuestionProcessing, setIsQuestionProcessing] = useState<boolean>(false);
+  const [isQuestionSpeaking, setIsQuestionSpeaking] = useState<boolean>(false);
+  const [questionTranscript, setQuestionTranscript] = useState<string>('');
+  const [questionAnswer, setQuestionAnswer] = useState<string>('');
+  const [questionError, setQuestionError] = useState<string>('');
 
   const text = (
     english: string,
@@ -529,9 +517,18 @@ const [questionError, setQuestionError] =
     setIsLoadingData(false);
   };
 
-  // --- INITIAL LOCAL STORAGE LOAD ---
+  // --- INITIAL LOCAL STORAGE LOAD + SERVICE WORKER ---
 
   useEffect(() => {
+    // ✅ FIX: register the service worker so the app shell (and cached
+    // GET API responses) can still load if the page is opened or
+    // reloaded while fully offline. Without this, going offline mid
+    // -session still works (all JS is already in memory), but a fresh
+    // load/reload while offline previously failed completely.
+    navigator.serviceWorker?.register('/sw.js').catch((error) => {
+      console.error('Service worker registration failed:', error);
+    });
+
     const savedLanguage =
       window.localStorage.getItem('duukatalk-language');
 
@@ -556,6 +553,18 @@ const [questionError, setQuestionError] =
       window.localStorage.getItem('duukatalk-theme');
 
     setIsDarkMode(savedTheme === 'dark');
+  }, []);
+
+  // ✅ Track online/offline transitions
+  useEffect(() => {
+    const updateOnline = () => setIsOnline(navigator.onLine);
+    updateOnline();
+    window.addEventListener('online', updateOnline);
+    window.addEventListener('offline', updateOnline);
+    return () => {
+      window.removeEventListener('online', updateOnline);
+      window.removeEventListener('offline', updateOnline);
+    };
   }, []);
 
   // =========================================================
@@ -612,76 +621,104 @@ const [questionError, setQuestionError] =
   };
 
   // =========================================================
-  // LOAD REAL DATABASE DATA
+  // OFFLINE QUEUE — sync when connectivity returns
   // =========================================================
 
-  const syncInFlightRef = useRef(false);
+  const refreshQueuedCount = async () => {
+    // lib/offline-queue exposes list* functions used elsewhere too; we
+    // just need counts here to drive the banner.
+    try {
+      const [{ listOfflineTransactions, listOfflineVoiceNotes }] = await Promise.all([
+        import('@/lib/offline-queue'),
+      ]);
+      const [pendingTx, pendingVoice] = await Promise.all([
+        listOfflineTransactions(),
+        listOfflineVoiceNotes(),
+      ]);
+      setQueuedCount(pendingTx.length + pendingVoice.length);
+    } catch (error) {
+      console.error('Failed to read offline queue counts:', error);
+    }
+  };
 
-  useEffect(() => {
-    const syncQueuedRecords = async () => {
-      if (!navigator.onLine || syncInFlightRef.current) {
-        return;
-      }
+  const flushOfflineQueue = async () => {
+    if (!navigator.onLine || syncingRef.current) return;
 
-      syncInFlightRef.current = true;
+    const { listOfflineTransactions, listOfflineVoiceNotes } = await import('@/lib/offline-queue');
+    const [pendingTx, pendingVoice] = await Promise.all([
+      listOfflineTransactions(),
+      listOfflineVoiceNotes(),
+    ]);
 
-      setFormMessage(
-        text(
-          'Syncing offline records...',
-          'Teegeyuza ku database...'
-        )
-      );
+    if (pendingTx.length === 0 && pendingVoice.length === 0) {
+      setQueuedCount(0);
+      return;
+    }
 
-      try {
-        const [transactionSync, voiceSync] = await Promise.all([
-          syncOfflineTransactions(),
-          syncOfflineVoiceNotes(),
-        ]);
+    syncingRef.current = true;
+    setIsSyncing(true);
+    setFormMessage(
+      text('Syncing offline records...', 'Teegeyuza ku database...')
+    );
 
-        if (
-          transactionSync.synced > 0 ||
-          voiceSync.synced > 0
-        ) {
-          setFormMessage(
-            text(
-              `Synced ${transactionSync.synced} offline transaction${transactionSync.synced === 1 ? '' : 's'} and ${voiceSync.synced} voice note${voiceSync.synced === 1 ? '' : 's'} to the ledger.`,
-              `Tukyuza ${transactionSync.synced} offline transaction${transactionSync.synced === 1 ? '' : 's'} ne ${voiceSync.synced} voice note${voiceSync.synced === 1 ? '' : 's'} ku ledger.`
-            )
-          );
-        } else {
-          setFormMessage(
-            text(
-              'No offline records to sync.',
-              'Tewali offline records ku sync.'
-            )
-          );
-        }
+    try {
+      const [transactionSync, voiceSync] = await Promise.all([
+        syncOfflineTransactions(),
+        syncOfflineVoiceNotes(),
+      ]);
 
-        await loadApiData();
-      } catch (error) {
-        console.error('Failed to sync offline queue:', error);
+      if (transactionSync.synced > 0 || voiceSync.synced > 0) {
         setFormMessage(
           text(
-            'Offline sync failed. It will retry automatically when the network is back.',
-            'Offline sync yabaddewo ekizibu. Ejja kugezebwa nga network eddawo.'
+            `Synced ${transactionSync.synced} offline transaction${transactionSync.synced === 1 ? '' : 's'} and ${voiceSync.synced} voice note${voiceSync.synced === 1 ? '' : 's'} to the ledger.`,
+            `Tukyuza ${transactionSync.synced} offline transaction${transactionSync.synced === 1 ? '' : 's'} ne ${voiceSync.synced} voice note${voiceSync.synced === 1 ? '' : 's'} ku ledger.`
           )
         );
-      } finally {
-        syncInFlightRef.current = false;
+      } else {
+        setFormMessage(
+          text('No offline records to sync.', 'Tewali offline records ku sync.')
+        );
       }
-    };
+
+      await refreshQueuedCount();
+      await loadApiData();
+    } catch (error) {
+      console.error('Failed to sync offline queue:', error);
+      setFormMessage(
+        text(
+          'Offline sync failed. It will retry automatically when the network is back.',
+          'Offline sync yabaddewo ekizibu. Ejja kugezebwa nga network eddawo.'
+        )
+      );
+    } finally {
+      syncingRef.current = false;
+      setIsSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    void refreshQueuedCount();
 
     const handleOnline = () => {
-      void syncQueuedRecords();
+      void flushOfflineQueue();
     };
 
     window.addEventListener('online', handleOnline);
-
-    void syncQueuedRecords();
+    void flushOfflineQueue();
 
     return () => {
       window.removeEventListener('online', handleOnline);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
+
+  // =========================================================
+  // LOAD REAL DATABASE DATA (initial + language changes)
+  // =========================================================
+
+  useEffect(() => {
+    void loadApiData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
   // =========================================================
@@ -716,32 +753,33 @@ const [questionError, setQuestionError] =
       );
     }
   );
+
   const notifications = [
-  ...riskFlags.map((flag) => ({
-    id: flag.id,
-    message: flag.message,
-  })),
-
-  ...debts
-    .filter((debt) => debt.amount > 200000)
-    .map((debt) => ({
-      id: `debt-${debt.id}`,
-      message: `${debt.customer} has an outstanding debt of UGX ${debt.amount.toLocaleString()}.`,
+    ...riskFlags.map((flag) => ({
+      id: flag.id,
+      message: flag.message,
     })),
 
-  ...debts
-    .filter((debt) => {
-      if (!debt.dueDate) return false;
+    ...debts
+      .filter((debt) => debt.amount > 200000)
+      .map((debt) => ({
+        id: `debt-${debt.id}`,
+        message: `${debt.customer} has an outstanding debt of UGX ${debt.amount.toLocaleString()}.`,
+      })),
 
-      const dueDate = new Date(debt.dueDate).getTime();
+    ...debts
+      .filter((debt) => {
+        if (!debt.dueDate) return false;
 
-      return !Number.isNaN(dueDate) && dueDate < reportNow;
-    })
-    .map((debt) => ({
-      id: `overdue-${debt.id}`,
-      message: `${debt.customer}'s debt is overdue.`,
-    })),
-];
+        const dueDate = new Date(debt.dueDate).getTime();
+
+        return !Number.isNaN(dueDate) && dueDate < reportNow;
+      })
+      .map((debt) => ({
+        id: `overdue-${debt.id}`,
+        message: `${debt.customer}'s debt is overdue.`,
+      })),
+  ];
 
   // =========================================================
   // HELPERS
@@ -789,7 +827,7 @@ const [questionError, setQuestionError] =
       setFormMessage(
         text(
           'Entry saved successfully after warning approval.',
-          'Ekiwandiiko kiteekeddwa bulungi olw\u2019okukkiriza okulabula.'
+          'Ekiwandiiko kiteekeddwa bulungi olw’okukkiriza okulabula.'
         )
       );
 
@@ -831,7 +869,7 @@ const [questionError, setQuestionError] =
 
         setMicError(errorData?.error || text(
           'The voice service did not respond. Please try again.',
-          'Sevesi y\u2019okuwandiika teziddemu. Ddamu ogezeeko.'
+          'Sevesi y’okuwandiika teziddemu. Ddamu ogezeeko.'
         ));
         setCreditWarning(null);
         return;
@@ -839,7 +877,7 @@ const [questionError, setQuestionError] =
 
       const data = (await response.json()) as VoiceToJsonResponse;
       if (!data.success || !data.transaction || !data.transactionId) {
-        setMicError(text('Could not understand the recording. Please try again.', 'Tetusobodde kutegeera ky\u2019owogedde. Ddamu ogezeeko.'));
+        setMicError(text('Could not understand the recording. Please try again.', 'Tetusobodde kutegeera ky’owogedde. Ddamu ogezeeko.'));
         setCreditWarning(null);
         return;
       }
@@ -850,7 +888,7 @@ const [questionError, setQuestionError] =
       await loadApiData();
     } catch (error) {
       console.error('Voice warning approval failed:', error);
-      setMicError(text('The voice record could not be saved after the warning approval.', 'Okurekoda tekusoboka kuteekebwa olw\u2019okukkiriza okulabula.'));
+      setMicError(text('The voice record could not be saved after the warning approval.', 'Okurekoda tekusoboka kuteekebwa olw’okukkiriza okulabula.'));
     } finally {
       setIsProcessing(false);
     }
@@ -867,7 +905,6 @@ const [questionError, setQuestionError] =
     );
   };
 
-  
   // =========================================================
   // PRIVACY SETTINGS
   // =========================================================
@@ -1002,7 +1039,7 @@ const [questionError, setQuestionError] =
       setEditError(
         text(
           'Please enter a customer, item, and valid amount.',
-          'Sooka oteekemu omuguzi, ekyaguddwa n\u2019omuwendo omutuufu.'
+          'Sooka oteekemu omuguzi, ekyaguddwa n’omuwendo omutuufu.'
         )
       );
 
@@ -1244,7 +1281,7 @@ const [questionError, setQuestionError] =
       setFormMessage(
         text(
           'Add a customer, item, and amount first.',
-          'Sooka omuguzi, ekyaguddwa, n\u2019omuwendo nga tonnaba kusiba.'
+          'Sooka omuguzi, ekyaguddwa, n’omuwendo nga tonnaba kusiba.'
         )
       );
 
@@ -1271,25 +1308,27 @@ const [questionError, setQuestionError] =
       timestamp: new Date().toISOString(),
     };
 
-    const queueEntry = {
-      id: offlineEntryId,
-      customer: customerName,
-      item: itemName,
-      amount,
-      paymentType,
-      dueDate:
-        paymentType === 'credit'
-          ? new Date().toISOString()
-          : null,
-      phone: user.phone || null,
-      createdAt: new Date().toISOString(),
+    const enqueueThisEntry = async () => {
+      await enqueueOfflineTransaction({
+        id: offlineEntryId,
+        customer: customerName,
+        item: itemName,
+        amount,
+        paymentType,
+        dueDate:
+          paymentType === 'credit'
+            ? new Date().toISOString()
+            : null,
+        phone: user.phone || null,
+      });
+      await refreshQueuedCount();
     };
 
     if (
       typeof navigator !== 'undefined' &&
       !navigator.onLine
     ) {
-      await enqueueOfflineTransaction(queueEntry);
+      await enqueueThisEntry();
 
       setTransactions((currentTransactions) => [
         newTransaction,
@@ -1404,11 +1443,12 @@ const [questionError, setQuestionError] =
       );
 
       setActiveTab('ledgers');
+      void loadApiData();
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown save error';
 
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        await enqueueOfflineTransaction(queueEntry);
+        await enqueueThisEntry();
 
         setTransactions((currentTransactions) => [
           newTransaction,
@@ -1535,11 +1575,33 @@ const [questionError, setQuestionError] =
     setIsProcessing(true);
     setMicError('');
 
-    // We no longer gate on navigator.onLine before trying the upload.
-    // navigator.onLine is unreliable -- it can report "online" while
-    // connected to a network with no real internet behind it. Instead,
-    // we try the real upload first and only fall back to the offline
-    // queue if the fetch itself fails (a genuine network error).
+    if (!navigator.onLine) {
+      try {
+        await enqueueOfflineVoiceNote(audioBlob, audioBlob.type || 'audio/webm');
+        await refreshQueuedCount();
+
+        setFormMessage(
+          text(
+            'You are offline. The recording is queued to sync when internet returns.',
+            'Tewali network. Okurekoda kujja kuteekebwa mu queue okutuuka network lw’erabuka.'
+          )
+        );
+
+        return;
+      } catch (error) {
+        console.error('Failed to queue offline voice note:', error);
+        setMicError(
+          text(
+            'The recording could not be queued while offline.',
+            'Okurekoda tekusoboka kuteekebwa mu queue nga offline.'
+          )
+        );
+
+        return;
+      } finally {
+        setIsProcessing(false);
+      }
+    }
 
     try {
       const formData = new FormData();
@@ -1582,7 +1644,7 @@ const [questionError, setQuestionError] =
           errorData?.error ||
             text(
               'The voice service did not respond. Please try again.',
-              'Sevesi y\u2019okuwandiika teziddemu. Ddamu ogezeeko.'
+              'Sevesi y’okuwandiika teziddemu. Ddamu ogezeeko.'
             )
         );
 
@@ -1598,7 +1660,7 @@ const [questionError, setQuestionError] =
         setMicError(
           text(
             'Received an unexpected response. Please try again.',
-            'Twafunye eky\u2019okuddamu ekitategeerekeka. Ddamu ogezeeko.'
+            'Twafunye eky’okuddamu ekitategeerekeka. Ddamu ogezeeko.'
           )
         );
 
@@ -1614,7 +1676,7 @@ const [questionError, setQuestionError] =
           data?.error ||
             text(
               'Could not understand the recording. Please try again.',
-              'Tetusobodde kutegeera ky\u2019owogedde. Ddamu ogezeeko.'
+              'Tetusobodde kutegeera ky’owogedde. Ddamu ogezeeko.'
             )
         );
 
@@ -1770,43 +1832,19 @@ const [questionError, setQuestionError] =
       setFormMessage(
         text(
           'Entry saved from your voice recording.',
-          'Ekiwandiiko kiteekeddwa okuva mu ky\u2019owogedde.'
+          'Ekiwandiiko kiteekeddwa okuva mu ky’owogedde.'
         )
       );
 
       setActiveTab('ledgers');
-    } catch (error) {
-      // The fetch itself failed -- this means we're genuinely offline
-      // (or the server is unreachable), regardless of what
-      // navigator.onLine reported. Fall back to queueing the raw
-      // recording so it can sync automatically once connectivity
-      // actually returns.
-      console.error('Voice upload failed, queueing offline:', error);
-
-      const mimeType = audioBlob.type || 'audio/webm';
-
-      try {
-        await enqueueOfflineVoiceNote(audioBlob, mimeType);
-
-        setFormMessage(
-          text(
-            'You are offline. The recording is queued to sync when internet returns.',
-            'Tewali network. Okurekoda kujja kuteekebwa mu queue okutuuka network lw\u2019erabuka.'
-          )
-        );
-      } catch (queueError) {
-        console.error(
-          'Failed to queue offline voice note:',
-          queueError
-        );
-
-        setMicError(
-          text(
-            'Something went wrong uploading your recording. Please check your connection and try again.',
-            'Wabaddewo ekizibu nga tuwaayo ky\u2019owogedde. Kebera network yo oyongere ogezeeko.'
-          )
-        );
-      }
+      void loadApiData();
+    } catch {
+      setMicError(
+        text(
+          'Something went wrong uploading your recording. Please check your connection and try again.',
+          'Wabaddewo ekizibu nga tuwaayo ky’owogedde. Kebera network yo oyongere ogezeeko.'
+        )
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -1991,7 +2029,7 @@ const [questionError, setQuestionError] =
     isProcessing
       ? text(
           'Processing recording',
-          'Nkola ku ky\u2019owogedde'
+          'Nkola ku ky’owogedde'
         )
       : isRecording
         ? text(
@@ -2006,8 +2044,8 @@ const [questionError, setQuestionError] =
   const micStatusMessage =
     isProcessing
       ? text(
-          'Processing your recording\u2026',
-          'Tukola ku ky\u2019owogedde\u2026'
+          'Processing your recording…',
+          'Tukola ku ky’owogedde…'
         )
       : micError
         ? micError
@@ -2021,175 +2059,169 @@ const [questionError, setQuestionError] =
 
 
   const stopQuestionMicrophoneTracks = () => {
-  questionStreamRef.current
-    ?.getTracks()
-    .forEach((track) => track.stop());
-
-  questionStreamRef.current = null;
-};
-const startQuestionRecording = async () => {
-  if (
-    isQuestionRecording ||
-    isQuestionProcessing
-  ) {
-    return;
-  }
-
-  try {
-    setQuestionError('');
-    setQuestionTranscript('');
-    setQuestionAnswer('');
-
-    if (
-      typeof window === 'undefined' ||
-      !navigator.mediaDevices?.getUserMedia
-    ) {
-      setQuestionError(
-        'Microphone access is not supported in this browser.'
-      );
-
-      return;
-    }
-
-    if (
-      typeof MediaRecorder ===
-      'undefined'
-    ) {
-      setQuestionError(
-        'Voice recording is not supported in this browser.'
-      );
-
-      return;
-    }
-
-    const stream =
-      await navigator.mediaDevices.getUserMedia(
-        {
-          audio: true,
-        }
-      );
-
-    questionStreamRef.current =
-      stream;
-
-    // Use the exact same recording format
-    // as the working transaction recorder.
-    const preferredMimeType =
-      'audio/webm';
-
-    const recorder =
-      MediaRecorder.isTypeSupported(
-        preferredMimeType
-      )
-        ? new MediaRecorder(
-            stream,
-            {
-              mimeType:
-                preferredMimeType,
-            }
-          )
-        : new MediaRecorder(
-            stream
-          );
-
-    questionMediaRecorderRef.current =
-      recorder;
-
-    questionAudioChunksRef.current =
-      [];
-
-    recorder.ondataavailable = (
-      event: BlobEvent
-    ) => {
-      if (
-        event.data &&
-        event.data.size > 0
-      ) {
-        questionAudioChunksRef.current.push(
-          event.data
-        );
-      }
-    };
-
-    recorder.onstop = () => {
-      stopQuestionMicrophoneTracks();
-
-      setIsQuestionRecording(false);
-
-      const mimeType =
-        recorder.mimeType ||
-        preferredMimeType;
-
-      const audioBlob =
-        new Blob(
-          questionAudioChunksRef.current,
-          {
-            type: mimeType,
-          }
-        );
-console.log('Question audio:', {
-  size: audioBlob.size,
-  type: audioBlob.type,
-  chunks: questionAudioChunksRef.current.length,
-});
-      questionAudioChunksRef.current =
-        [];
-
-      void askVoiceQuestion(
-        audioBlob
-      );
-    };
-
-    recorder.onerror = () => {
-      stopQuestionMicrophoneTracks();
-
-      setIsQuestionRecording(false);
-
-      setQuestionError(
-        'Recording failed. Please try again.'
-      );
-    };
-
-    recorder.start();
-
-    setIsQuestionRecording(true);
-  } catch (error) {
-    console.error(
-      'Failed to start question recording:',
-      error
-    );
-
     questionStreamRef.current
       ?.getTracks()
       .forEach((track) => track.stop());
 
-    questionStreamRef.current =
-      null;
+    questionStreamRef.current = null;
+  };
+  const startQuestionRecording = async () => {
+    if (
+      isQuestionRecording ||
+      isQuestionProcessing
+    ) {
+      return;
+    }
 
-    setIsQuestionRecording(false);
+    try {
+      setQuestionError('');
+      setQuestionTranscript('');
+      setQuestionAnswer('');
 
-    setQuestionError(
-      'Could not access the microphone.'
-    );
-  }
-};
+      if (
+        typeof window === 'undefined' ||
+        !navigator.mediaDevices?.getUserMedia
+      ) {
+        setQuestionError(
+          'Microphone access is not supported in this browser.'
+        );
+
+        return;
+      }
+
+      if (
+        typeof MediaRecorder ===
+        'undefined'
+      ) {
+        setQuestionError(
+          'Voice recording is not supported in this browser.'
+        );
+
+        return;
+      }
+
+      const stream =
+        await navigator.mediaDevices.getUserMedia(
+          {
+            audio: true,
+          }
+        );
+
+      questionStreamRef.current =
+        stream;
+
+      const preferredMimeType =
+        'audio/webm';
+
+      const recorder =
+        MediaRecorder.isTypeSupported(
+          preferredMimeType
+        )
+          ? new MediaRecorder(
+              stream,
+              {
+                mimeType:
+                  preferredMimeType,
+              }
+            )
+          : new MediaRecorder(
+              stream
+            );
+
+      questionMediaRecorderRef.current =
+        recorder;
+
+      questionAudioChunksRef.current =
+        [];
+
+      recorder.ondataavailable = (
+        event: BlobEvent
+      ) => {
+        if (
+          event.data &&
+          event.data.size > 0
+        ) {
+          questionAudioChunksRef.current.push(
+            event.data
+          );
+        }
+      };
+
+      recorder.onstop = () => {
+        stopQuestionMicrophoneTracks();
+
+        setIsQuestionRecording(false);
+
+        const mimeType =
+          recorder.mimeType ||
+          preferredMimeType;
+
+        const audioBlob =
+          new Blob(
+            questionAudioChunksRef.current,
+            {
+              type: mimeType,
+            }
+          );
+
+        questionAudioChunksRef.current =
+          [];
+
+        void askVoiceQuestion(
+          audioBlob
+        );
+      };
+
+      recorder.onerror = () => {
+        stopQuestionMicrophoneTracks();
+
+        setIsQuestionRecording(false);
+
+        setQuestionError(
+          'Recording failed. Please try again.'
+        );
+      };
+
+      recorder.start();
+
+      setIsQuestionRecording(true);
+    } catch (error) {
+      console.error(
+        'Failed to start question recording:',
+        error
+      );
+
+      questionStreamRef.current
+        ?.getTracks()
+        .forEach((track) => track.stop());
+
+      questionStreamRef.current =
+        null;
+
+      setIsQuestionRecording(false);
+
+      setQuestionError(
+        'Could not access the microphone.'
+      );
+    }
+  };
   const stopQuestionRecording = () => {
-  const recorder =
-    questionMediaRecorderRef.current;
+    const recorder =
+      questionMediaRecorderRef.current;
 
-  if (
-    recorder &&
-    recorder.state !== 'inactive'
-  ) {
-    recorder.stop();
-  } else {
-    stopQuestionMicrophoneTracks();
+    if (
+      recorder &&
+      recorder.state !== 'inactive'
+    ) {
+      recorder.stop();
+    } else {
+      stopQuestionMicrophoneTracks();
 
-    setIsQuestionRecording(false);
-  }
-};
+      setIsQuestionRecording(false);
+    }
+  };
 
-    const askVoiceQuestion = async (
+  const askVoiceQuestion = async (
     audioBlob: Blob
   ) => {
     setIsQuestionProcessing(true);
@@ -2302,7 +2334,7 @@ console.log('Question audio:', {
       setIsQuestionProcessing(false);
     }
   };
-    const handleQuestionMicClick = () => {
+  const handleQuestionMicClick = () => {
     if (
       isQuestionProcessing ||
       isQuestionSpeaking
@@ -2342,7 +2374,7 @@ console.log('Question audio:', {
               </span>
 
               <span className="text-sm">
-                \ud83d\udc4b
+                👋
               </span>
             </div>
 
@@ -2352,8 +2384,12 @@ console.log('Question audio:', {
           </div>
         </div>
 
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-          Connected
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+          isOnline
+            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+            : 'bg-amber-100 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200'
+        }`}>
+          {isOnline ? text('Online', 'Ku mukutu') : text('Offline', 'Teri ku mukutu')}
         </span>
       </div>
 
@@ -2435,7 +2471,7 @@ console.log('Question audio:', {
 
       {/* Manual Input Form */}
       <form
-        onSubmit={handleSaveEntry}
+        onSubmit={(e) => void handleSaveEntry(e)}
         className="space-y-3"
       >
         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
@@ -2465,7 +2501,7 @@ console.log('Question audio:', {
 
             <input
               type="text"
-              placeholder="e.g. Nakato Grace or 0772\u2026"
+              placeholder="e.g. Nakato Grace or 0772…"
               value={formData.customer}
               onChange={(e) =>
                 setFormData({
@@ -2565,7 +2601,7 @@ console.log('Question audio:', {
           >
             <DollarSign size={16} />
 
-            \ud83d\udcb5{' '}
+            💵{' '}
             {text(
               'Cash',
               'Ensimbi'
@@ -2588,7 +2624,7 @@ console.log('Question audio:', {
           >
             <CreditCard size={16} />
 
-            \ud83d\udcd2{' '}
+            📒{' '}
             {text(
               'Credit',
               'Omubanja'
@@ -2606,7 +2642,7 @@ console.log('Question audio:', {
             'Save Entry',
             'Kola'
           )}{' '}
-          \u2713
+          ✓
         </button>
 
         {formMessage && (
@@ -2799,8 +2835,8 @@ console.log('Question audio:', {
           <input
             type="text"
             placeholder={text(
-              'Search customer or item\u2026',
-              'Noonya omuguzi oba ekyaguddwa\u2026'
+              'Search customer or item…',
+              'Noonya omuguzi oba ekyaguddwa…'
             )}
             value={searchQuery}
             onChange={(e) =>
@@ -2849,22 +2885,22 @@ console.log('Question audio:', {
               <span className="text-xs font-bold">
                 {isQuestionRecording
                   ? text(
-                      'Listening\u2026',
-                      'Mpulira\u2026'
+                      'Listening…',
+                      'Mpulira…'
                     )
                   : isQuestionProcessing
                     ? text(
-                        'Thinking\u2026',
-                        'Ndowooza\u2026'
+                        'Thinking…',
+                        'Ndowooza…'
                       )
                     : isQuestionSpeaking
                       ? text(
-                          'Speaking\u2026',
-                          'Njogera\u2026'
+                          'Speaking…',
+                          'Njogera…'
                         )
                       : text(
                           'Voice Assistant',
-                          'Omuyambi w\u2019eddoboozi'
+                          'Omuyambi w’eddoboozi'
                         )}
               </span>
             </div>
@@ -3187,7 +3223,7 @@ console.log('Question audio:', {
               <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
                 {text(
                   'Payment Type',
-                  'Engeri y\u2019okusasula'
+                  'Engeri y’okusasula'
                 )}
               </label>
 
@@ -3208,7 +3244,7 @@ console.log('Question audio:', {
                       : 'border-slate-200 dark:border-slate-700 text-slate-500'
                   }`}
                 >
-                  \ud83d\udcb5{' '}
+                  💵{' '}
                   {text(
                     'Cash',
                     'Ensimbi'
@@ -3231,7 +3267,7 @@ console.log('Question audio:', {
                       : 'border-slate-200 dark:border-slate-700 text-slate-500'
                   }`}
                 >
-                  \ud83d\udcd2{' '}
+                  📒{' '}
                   {text(
                     'Credit',
                     'Omubanja'
@@ -3247,7 +3283,7 @@ console.log('Question audio:', {
                 <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
                   {text(
                     'Due Date',
-                    'Olunaku lw\u2019okusasula'
+                    'Olunaku lw’okusasula'
                   )}
                 </label>
 
@@ -3295,7 +3331,7 @@ console.log('Question audio:', {
 
               <button
                 type="button"
-                onClick={handleSaveEdit}
+                onClick={() => void handleSaveEdit()}
                 disabled={isSavingEdit}
                 className="py-2.5 rounded-xl bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition disabled:opacity-60"
               >
@@ -3456,9 +3492,7 @@ console.log('Question audio:', {
 
               <button
                 type="button"
-                onClick={
-                  handleConfirmDelete
-                }
+                onClick={() => void handleConfirmDelete()}
                 disabled={
                   isDeletingTransaction
                 }
@@ -3591,7 +3625,7 @@ console.log('Question audio:', {
             <strong>
               {text(
                 'Exceeded loan limit',
-                'Omusolo gw\u2019obbanja gususse'
+                'Omusolo gw’obbanja gususse'
               )}
             </strong>
 
@@ -3848,7 +3882,7 @@ console.log('Question audio:', {
           </div>
         </div>
 
-        {/* Database transaction information */}
+        {/* Savings & Loan Readiness Coach */}
         <div
           className={`p-4 rounded-xl border ${
             isDarkMode
@@ -3859,7 +3893,7 @@ console.log('Question audio:', {
           <h4 className="mb-3 text-xs font-bold">
             {text(
               'Savings & Loan Readiness Coach',
-              'Omuwandiisi w\u2019ensawo n\u2019ensimbi'
+              'Omuwandiisi w’ensawo n’ensimbi'
             )}
           </h4>
 
@@ -3869,7 +3903,7 @@ console.log('Question audio:', {
                 <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
                   {text(
                     'Loan readiness score',
-                    'Omuwendo gw\u2019okukola olwanji'
+                    'Omuwendo gw’okukola olwanji'
                   )}
                 </span>
                 <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-bold text-white">
@@ -3910,6 +3944,7 @@ console.log('Question audio:', {
           </div>
         </div>
 
+        {/* Database transaction information */}
         <div
           className={`p-4 rounded-xl border ${
             isDarkMode
@@ -3988,171 +4023,121 @@ console.log('Question audio:', {
   return (
     <div
       className={`min-h-screen flex justify-center items-center ${
-        isDarkMode
-          ? 'bg-gray-950 text-white'
-          : 'bg-slate-100 text-slate-800'
+        isDarkMode ? 'bg-gray-950 text-white' : 'bg-slate-100 text-slate-800'
       }`}
     >
       <div
         className={`w-full max-w-md min-h-screen sm:min-h-0 sm:h-[52.5rem] sm:rounded-3xl shadow-2xl flex flex-col justify-between overflow-hidden relative ${
-          isDarkMode
-            ? 'bg-slate-900'
-            : 'bg-white'
+          isDarkMode ? 'bg-slate-900' : 'bg-white'
         }`}
       >
         {/* App Header */}
-    <header className="bg-blue-900 text-white px-5 py-4 flex items-center justify-between shadow-md">
-  <div className="flex items-center gap-2">
-    <div className="bg-amber-500 p-2 rounded-lg text-slate-900 font-bold">
-      <Mic size={18} />
-    </div>
+        <header className="bg-blue-900 text-white px-5 py-4 flex items-center justify-between shadow-md">
+          <div className="flex items-center gap-2">
+            <div className="bg-amber-500 p-2 rounded-lg text-slate-900 font-bold">
+              <Mic size={18} />
+            </div>
 
-    <h1 className="font-bold text-base leading-tight">
-      {user.businessName || 'DuukaTalk'}
-    </h1>
-  </div>
-
-  <div className="flex items-center gap-2">
-    <label
-      className="sr-only"
-      htmlFor="language-mode"
-    >
-      Language
-    </label>
-
-    <select
-      id="language-mode"
-      value={language}
-      onChange={(event) =>
-        handleLanguageChange(
-          event.target.value as Language
-        )
-      }
-      className="max-w-28 rounded-md border border-blue-600 bg-blue-800/80 px-2 py-1 text-xs font-semibold text-white outline-none"
-    >
-      {LANGUAGE_OPTIONS.map((option) => (
-        <option
-          key={option.value}
-          value={option.value}
-        >
-          {option.label}
-        </option>
-      ))}
-    </select>
-
-    {/* Notifications */}
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() =>
-          setShowNotifications(
-            (open) => !open
-          )
-        }
-        className="relative rounded-md p-1.5 text-blue-200 transition hover:bg-blue-800/80 hover:text-white"
-        aria-label={text(
-          'Notifications',
-          'Obubaka'
-        )}
-      >
-        <Bell size={18} />
-
-        {notifications.length > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
-            {notifications.length > 9
-              ? '9+'
-              : notifications.length}
-          </span>
-        )}
-      </button>
-
-      {showNotifications && (
-        <div className="absolute right-0 top-10 z-50 w-72 rounded-xl border border-slate-200 bg-white p-3 text-slate-800 shadow-xl dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-bold">
-              {text(
-                'Notifications',
-                'Obubaka'
-              )}
-            </h2>
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowNotifications(false)
-              }
-              className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
-              aria-label={text(
-                'Close notifications',
-                'Ggalawo obubaka'
-              )}
-            >
-              <X size={16} />
-            </button>
+            <h1 className="font-bold text-base leading-tight">
+              {user.businessName || 'DuukaTalk'}
+            </h1>
           </div>
 
-          {notifications.length === 0 ? (
-            <p className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
-              {text(
-                'No new notifications',
-                'Tewali bubaka bupya'
-              )}
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {notifications.map(
-                (notification) => (
-                  <div
-                    key={notification.id}
-                    className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
-                  >
-                    <div className="flex gap-2">
-                      <AlertCircle
-                        size={15}
-                        className="mt-0.5 shrink-0"
-                      />
+          <div className="flex items-center gap-2">
+            <label className="sr-only" htmlFor="language-mode">
+              Language
+            </label>
 
-                      <span>
-                        {notification.message}
-                      </span>
-                    </div>
+            <select
+              id="language-mode"
+              value={language}
+              onChange={(event) =>
+                handleLanguageChange(event.target.value as Language)
+              }
+              className="max-w-28 rounded-md border border-blue-600 bg-blue-800/80 px-2 py-1 text-xs font-semibold text-white outline-none"
+            >
+              {LANGUAGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowNotifications((open) => !open)}
+                className="relative rounded-md p-1.5 text-blue-200 transition hover:bg-blue-800/80 hover:text-white"
+                aria-label={text('Notifications', 'Obubaka')}
+              >
+                <Bell size={18} />
+
+                {notifications.length > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 top-10 z-50 w-72 rounded-xl border border-slate-200 bg-white p-3 text-slate-800 shadow-xl dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-sm font-bold">
+                      {text('Notifications', 'Obubaka')}
+                    </h2>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowNotifications(false)}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
+                      aria-label={text('Close notifications', 'Ggalawo obubaka')}
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                )
+
+                  {notifications.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                      {text('No new notifications', 'Tewali bubaka bupya')}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+                        >
+                          <div className="flex gap-2">
+                            <AlertCircle size={15} className="mt-0.5 shrink-0" />
+
+                            <span>{notification.message}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      )}
-    </div>
 
-    {/* Settings */}
-    <button
-      type="button"
-      onClick={() =>
-        setIsSettingsOpen(
-          (open) => !open
-        )
-      }
-      className="rounded-md p-1.5 text-blue-200 transition hover:bg-blue-800/80 hover:text-white"
-      aria-label={text(
-        'Settings',
-        'Settings'
-      )}
-    >
-      <Settings size={18} />
-    </button>
-  </div>
-</header>
+            {/* Settings */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen((open) => !open)}
+              className="rounded-md p-1.5 text-blue-200 transition hover:bg-blue-800/80 hover:text-white"
+              aria-label={text('Settings', 'Settings')}
+            >
+              <Settings size={18} />
+            </button>
+          </div>
+        </header>
+
         {/* SETTINGS */}
         {isSettingsOpen && (
           <div className="absolute right-3 top-16 z-20 w-64 rounded-xl border border-slate-200 bg-white p-3 text-slate-800 shadow-xl dark:border-slate-700 dark:bg-slate-800 dark:text-white">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-bold">
-                {text(
-                  'Settings',
-                  'Settings'
-                )}
-              </h2>
+              <h2 className="text-sm font-bold">{text('Settings', 'Settings')}</h2>
 
               <button
                 type="button"
@@ -4160,46 +4145,28 @@ console.log('Question audio:', {
                 aria-label="Toggle theme"
                 className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
-                {isDarkMode ? (
-                  <Sun size={16} />
-                ) : (
-                  <Moon size={16} />
-                )}
+                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
               </button>
             </div>
 
             <button
               type="button"
-              onClick={() =>
-                setIsPrivacyOpen(
-                  (open) => !open
-                )
-              }
+              onClick={() => setIsPrivacyOpen((open) => !open)}
               className="mb-2 w-full rounded-lg bg-slate-100 px-3 py-2 text-left text-xs font-semibold dark:bg-slate-700"
             >
-              {text(
-                'Privacy',
-                'Obukuumi'
-              )}
+              {text('Privacy', 'Obukuumi')}
             </button>
 
             {isPrivacyOpen && (
               <div className="space-y-2">
                 <p className="text-[11px] text-slate-500">
-                  {text(
-                    'Change PIN or phone number',
-                    'Kyusa PIN oba essimu'
-                  )}
+                  {text('Change PIN or phone number', 'Kyusa PIN oba essimu')}
                 </p>
 
                 <input
                   value={newPin}
                   onChange={(event) =>
-                    setNewPin(
-                      event.target.value
-                        .replace(/\D/g, '')
-                        .slice(0, 4)
-                    )
+                    setNewPin(event.target.value.replace(/\D/g, '').slice(0, 4))
                   }
                   placeholder="New 4-digit PIN"
                   className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs dark:border-slate-600 dark:bg-slate-900"
@@ -4208,117 +4175,121 @@ console.log('Question audio:', {
 
                 <input
                   value={newPhone}
-                  onChange={(event) =>
-                    setNewPhone(
-                      event.target.value
-                    )
-                  }
+                  onChange={(event) => setNewPhone(event.target.value)}
                   placeholder="Phone number"
                   className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs dark:border-slate-600 dark:bg-slate-900"
                 />
 
                 <button
                   type="button"
-                  onClick={() =>
-                    void handleSavePrivacy()
-                  }
+                  onClick={() => void handleSavePrivacy()}
                   className="w-full rounded-lg bg-blue-900 px-3 py-2 text-xs font-semibold text-white"
                 >
-                  {text(
-                    'Save changes',
-                    'Tereka enkyukakyuka'
-                  )}
+                  {text('Save changes', 'Tereka enkyukakyuka')}
                 </button>
 
                 {settingsMessage && (
-                  <p className="text-[11px] text-emerald-600">
-                    {settingsMessage}
-                  </p>
+                  <p className="text-[11px] text-emerald-600">{settingsMessage}</p>
                 )}
               </div>
             )}
 
             <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               className="mt-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
             >
               <LogOut size={15} />
 
-              {text(
-                'Log out',
-                'Fuluma'
-              )}
+              {text('Log out', 'Fuluma')}
             </button>
           </div>
         )}
 
-        {/* Dynamic View Content */}
+        {/* ✅ Offline / sync status banner */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {activeTab === 'record' &&
-            renderRecordScreen()}
+          {(!isOnline || queuedCount > 0) && (
+            <div
+              className={`rounded-lg px-3 py-2 text-xs font-medium ${
+                isOnline ? 'bg-blue-50 text-blue-900' : 'bg-amber-50 text-amber-950'
+              }`}
+              role="status"
+            >
+              {!isOnline
+                ? text(
+                    'You are offline. Entries and voice notes are saved on this phone and will sync later.',
+                    'Toli ku mukutu. Ebiwandiiko n\'amaloboozi biteekebwa ku ssimu ne bigenda oluvannyuma.'
+                  )
+                : isSyncing
+                  ? text(`Syncing ${queuedCount} queued item(s)…`, `Tusindika ebyateekebwa ${queuedCount}…`)
+                  : queuedCount > 0
+                    ? text(`${queuedCount} item(s) waiting to sync.`, `Ebyateekebwa ${queuedCount} birinda okugenda.`)
+                    : null}
+            </div>
+          )}
 
-          {activeTab === 'ledgers' &&
-            renderLedgersScreen()}
+          {creditWarning && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              <p className="mb-2">{creditWarning.message}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    creditWarning.mode === 'manual'
+                      ? void handleManualWarningProceed()
+                      : void handleVoiceWarningProceed()
+                  }
+                  className="flex-1 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  {text('Proceed anyway', 'Genda mu maaso')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreditWarning(null)}
+                  className="flex-1 rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800"
+                >
+                  {text('Cancel', 'Sazaamu')}
+                </button>
+              </div>
+            </div>
+          )}
 
-          {activeTab === 'debts' &&
-            renderDebtsScreen()}
+          {activeTab === 'record' && renderRecordScreen()}
 
-          {activeTab === 'reports' &&
-            renderReportsScreen()}
+          {activeTab === 'ledgers' && renderLedgersScreen()}
+
+          {activeTab === 'debts' && renderDebtsScreen()}
+
+          {activeTab === 'reports' && renderReportsScreen()}
         </div>
 
         {/* Bottom Navigation */}
         <nav
           className={`border-t flex justify-around py-2 px-1 ${
-            isDarkMode
-              ? 'bg-slate-900 border-slate-800'
-              : 'bg-white border-slate-200'
+            isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
           }`}
         >
-          {navItems.map(
-            ({
-              name,
-              tab,
-              icon: Icon,
-            }) => {
-              const isActive =
-                activeTab === tab;
+          {navItems.map(({ name, tab, icon: Icon }) => {
+            const isActive = activeTab === tab;
 
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() =>
-                    setActiveTab(tab)
-                  }
-                  aria-current={
-                    isActive
-                      ? 'page'
-                      : undefined
-                  }
-                  className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-medium transition ${
-                    isActive
-                      ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                      : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <Icon
-                    size={18}
-                    strokeWidth={
-                      isActive
-                        ? 2.5
-                        : 2
-                    }
-                  />
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-xl px-2 py-2 text-xs font-medium transition ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 2} />
 
-                  <span className="truncate">
-                    {text(name)}
-                  </span>
-                </button>
-              );
-            }
-          )}
+                <span className="truncate">{text(name)}</span>
+              </button>
+            );
+          })}
         </nav>
       </div>
 

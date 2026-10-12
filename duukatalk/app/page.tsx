@@ -1,19 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, Mic, BookOpen, BarChart3 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { LANGUAGE_OPTIONS, Language, translate } from '@/lib/i18n';
 
 export default function GetStartedPage() {
   const router = useRouter();
-  const [language, setLanguage] = useState<Language>(() => {
-    if (typeof window === 'undefined') return 'EN';
+  const [language, setLanguage] = useState<Language>('EN');
+
+  useEffect(() => {
     const saved = window.localStorage.getItem('duukatalk-language');
-    return saved && LANGUAGE_OPTIONS.some((option) => option.value === saved)
-      ? (saved as Language)
-      : 'EN';
-  });
+    if (saved && LANGUAGE_OPTIONS.some((option) => option.value === saved)) {
+      setLanguage(saved as Language);
+    }
+  }, []);
 
   const text = (value: string) => translate(language, value);
 
