@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { NextRequest } from "next/server";
 
@@ -186,7 +187,8 @@ export async function POST(req: NextRequest) {
       // filters Firestore transactions by vendor_id.
       answerText =
         await buildDailySummary(
-          vendorId
+          vendorId,
+          await getVendorCurrency(vendorId)
         );
     } else if (
       intent.query_type ===

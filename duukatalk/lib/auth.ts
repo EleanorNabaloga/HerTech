@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { getDb } from "./firebase";
+import { DEFAULT_CURRENCY, resolveCurrency } from "./money";
 
 const VENDORS_COLLECTION = "vendors";
 const COUNTERS_COLLECTION = "counters";
@@ -155,7 +156,8 @@ export async function signupVendor(params: {
     ownerName: ownerName?.trim() || "",
     phone: phone?.trim() || "",
     country: country?.trim() || "",
-    currency: currency?.trim() || "",
+    // Always store a currency so messages never fall back to UGX.
+    currency: resolveCurrency(currency, country),
     failedAttempts: 0,
     lockedUntil: null,
     createdAt: now,
@@ -291,7 +293,7 @@ export async function loginVendor(
     ownerName: record.ownerName,
     phone: record.phone,
     country: record.country,
-    currency: record.currency,
+    currency: resolveCurrency(record.currency, record.country),
   };
 }
 
@@ -326,4 +328,22 @@ export async function updateVendorProfile(
   return {
     phone: params.phone?.trim() || "",
   };
+}
+/** The currency the vendor chose at signup (falls back to UGX). */
+export async function getVendorCurrency(
+  vendorId: string | undefined | null
+): Promise<string> {
+  if (!vendorId) return DEFAULT_CURRENCY;
+
+  try {
+    const snap = await getDb()
+      .collection(VENDORS_COLLECTION)
+      .doc(vendorId)
+      .get();
+    const data = snap.exists ? snap.data() : undefined;
+    return resolveCurrency(data?.currency, data?.country);
+  } catch (error) {
+    console.error("Failed to look up vendor currency:", error);
+    return DEFAULT_CURRENCY;
+  }
 }

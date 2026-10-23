@@ -1,4 +1,5 @@
 import { CREDIT_LIMIT, LARGE_QUANTITY_THRESHOLD, isOutstandingCredit } from "./credit";
+import { formatDay, formatMoney } from "./money";
 
 export type Language = "EN" | "LUG" | "SW" | "AR" | "FR" | "MIX";
 
@@ -54,14 +55,15 @@ export function creditLimitWarning(
   language: Language,
   customer: string,
   outstandingCredit: number,
+  currency?: string,
 ): string {
   return localize(
     language,
-    `Warning: ${customer} already has UGX ${outstandingCredit.toLocaleString()} in outstanding credit, above the UGX ${CREDIT_LIMIT.toLocaleString()} limit. Pause new lending and recover cash first. Use the tick to accept the warning and record, or use the cross to refuse.`,
-    `Okulabula: ${customer} alina amabanja agasigadde UGX ${outstandingCredit.toLocaleString()}, okusukka ku kkomo lya UGX ${CREDIT_LIMIT.toLocaleString()}. Lekeka okukuza obulava obupya era funya ssente. Kozesa akatikkulu okukkiriza okulabula n'okuwandiika, oba akamukiye okugaana.`,
-    `Tahadhari: ${customer} tayari ana deni la UGX ${outstandingCredit.toLocaleString()}, lililo juu ya kikomo cha UGX ${CREDIT_LIMIT.toLocaleString()}. Simama kutoa mkopo mpya na kukusanya pesa kwanza. Tumia alama ya tiki kukubali tahadhari na kurekodi, au alama ya x kukataa.`,
-    `تحذير: ${customer} لديه بالفعل ديون مستحقة قدرها UGX ${outstandingCredit.toLocaleString()}، وهي أعلى من الحد UGX ${CREDIT_LIMIT.toLocaleString()}. أوقف منح القروض الجديدة وابدأ في تحصيل النقد أولاً. استخدم علامة صح للتأكيد أو علامة × للرفض.`,
-    `Avertissement : ${customer} a déjà un crédit impayé de UGX ${outstandingCredit.toLocaleString()}, au-dessus de la limite de UGX ${CREDIT_LIMIT.toLocaleString()}. Suspendre tout nouveau prêt et récupérer l’argent d’abord. Utilisez la coche pour accepter l’avertissement et enregistrer, ou la croix pour refuser.`,
+    `Warning: ${customer} already has ${formatMoney(outstandingCredit, currency)} in outstanding credit, above the ${formatMoney(CREDIT_LIMIT, currency)} limit. Pause new lending and recover cash first. Use the tick to accept the warning and record, or use the cross to refuse.`,
+    `Okulabula: ${customer} alina amabanja agasigadde ${formatMoney(outstandingCredit, currency)}, okusukka ku kkomo lya ${formatMoney(CREDIT_LIMIT, currency)}. Lekeka okukuza obulava obupya era funya ssente. Kozesa akatikkulu okukkiriza okulabula n'okuwandiika, oba akamukiye okugaana.`,
+    `Tahadhari: ${customer} tayari ana deni la ${formatMoney(outstandingCredit, currency)}, lililo juu ya kikomo cha ${formatMoney(CREDIT_LIMIT, currency)}. Simama kutoa mkopo mpya na kukusanya pesa kwanza. Tumia alama ya tiki kukubali tahadhari na kurekodi, au alama ya x kukataa.`,
+    `تحذير: ${customer} لديه بالفعل ديون مستحقة قدرها ${formatMoney(outstandingCredit, currency)}، وهي أعلى من الحد ${formatMoney(CREDIT_LIMIT, currency)}. أوقف منح القروض الجديدة وابدأ في تحصيل النقد أولاً. استخدم علامة صح للتأكيد أو علامة × للرفض.`,
+    `Avertissement : ${customer} a déjà un crédit impayé de ${formatMoney(outstandingCredit, currency)}, au-dessus de la limite de ${formatMoney(CREDIT_LIMIT, currency)}. Suspendre tout nouveau prêt et récupérer l’argent d’abord. Utilisez la coche pour accepter l’avertissement et enregistrer, ou la croix pour refuser.`,
   );
 }
 
@@ -73,6 +75,7 @@ export function parseLanguage(value: string | null | undefined): Language {
 export function evaluateRiskFlags(
   transactions: RiskTransaction[],
   language: Language = "EN",
+  currency?: string,
 ): RiskFlag[] {
   const flags: RiskFlag[] = [];
   const today = new Date().toISOString().split("T")[0];
@@ -93,11 +96,11 @@ export function evaluateRiskFlags(
         severity: total > CREDIT_LIMIT * 1.5 ? "critical" : "warning",
         message: localize(
           language,
-          `${name} now owes UGX ${total.toLocaleString()}, over the ${CREDIT_LIMIT.toLocaleString()} limit`,
-          `${name} kati alina omubanja gwa UGX ${total.toLocaleString()}, gusukkiridde ekkomo lya UGX ${CREDIT_LIMIT.toLocaleString()}`,
-          `${name} anadaiwa UGX ${total.toLocaleString()}, zaidi ya kikomo cha UGX ${CREDIT_LIMIT.toLocaleString()}`,
-          `${name} مدين الآن بـ UGX ${total.toLocaleString()}، وهو أعلى من الحد ${CREDIT_LIMIT.toLocaleString()}`,
-          `${name} doit maintenant UGX ${total.toLocaleString()}, au-delà de la limite de ${CREDIT_LIMIT.toLocaleString()}`,
+          `${name} now owes ${formatMoney(total, currency)}, over the ${formatMoney(CREDIT_LIMIT, currency)} limit`,
+          `${name} kati alina omubanja gwa ${formatMoney(total, currency)}, gusukkiridde ekkomo lya ${formatMoney(CREDIT_LIMIT, currency)}`,
+          `${name} anadaiwa ${formatMoney(total, currency)}, zaidi ya kikomo cha ${formatMoney(CREDIT_LIMIT, currency)}`,
+          `${name} مدين الآن بـ ${formatMoney(total, currency)}، وهو أعلى من الحد ${formatMoney(CREDIT_LIMIT, currency)}`,
+          `${name} doit maintenant ${formatMoney(total, currency)}, au-delà de la limite de ${formatMoney(CREDIT_LIMIT, currency)}`,
         ),
         details: { customerName: name, amountOwed: total, limit: CREDIT_LIMIT },
       });
@@ -141,11 +144,11 @@ export function evaluateRiskFlags(
         severity: dueDay < today ? "critical" : "warning",
         message: localize(
           language,
-          `${txn.customer_name}'s payment for ${txn.item} was due ${txn.due_date}`,
-          `Okusasula kwa ${txn.customer_name} ku ${txn.item} kwali kutuuse ${txn.due_date}`,
-          `${txn.customer_name}'s malipo ya ${txn.item} yalikuwa yakusubiri ${txn.due_date}`,
-          `استحق الدفع لـ ${txn.customer_name} مقابل ${txn.item} بتاريخ ${txn.due_date}`,
-          `Le paiement de ${txn.customer_name} pour ${txn.item} était dû le ${txn.due_date}`,
+          `${txn.customer_name}'s payment for ${txn.item} was due ${formatDay(txn.due_date)}`,
+          `Okusasula kwa ${txn.customer_name} ku ${txn.item} kwali kutuuse ${formatDay(txn.due_date)}`,
+          `${txn.customer_name}'s malipo ya ${txn.item} yalikuwa yakusubiri ${formatDay(txn.due_date)}`,
+          `استحق الدفع لـ ${txn.customer_name} مقابل ${txn.item} بتاريخ ${formatDay(txn.due_date)}`,
+          `Le paiement de ${txn.customer_name} pour ${txn.item} était dû le ${formatDay(txn.due_date)}`,
         ),
         details: {
           customerName: txn.customer_name,
@@ -173,11 +176,11 @@ export function evaluateRiskFlags(
       severity: "critical",
       message: localize(
         language,
-        `Cash at hand is lower than outstanding credit: cash UGX ${totalCash.toLocaleString()} vs credit UGX ${totalCredit.toLocaleString()}`,
-        `Ssente eziriwo zisinga obutono okusinga amabanja agasigadde: cash UGX ${totalCash.toLocaleString()} vs credit UGX ${totalCredit.toLocaleString()}`,
-        `Pesa zilizopo ni chache kuliko deni iliyobaki: cash UGX ${totalCash.toLocaleString()} dhidi ya credit UGX ${totalCredit.toLocaleString()}`,
-        `النقد المتوفر أقل من الديون المستحقة: نقد UGX ${totalCash.toLocaleString()} مقابل دين UGX ${totalCredit.toLocaleString()}`,
-        `La trésorerie disponible est inférieure au crédit restant : cash UGX ${totalCash.toLocaleString()} versus crédit UGX ${totalCredit.toLocaleString()}`,
+        `Cash at hand is lower than outstanding credit: cash ${formatMoney(totalCash, currency)} vs credit ${formatMoney(totalCredit, currency)}`,
+        `Ssente eziriwo zisinga obutono okusinga amabanja agasigadde: cash ${formatMoney(totalCash, currency)} vs credit ${formatMoney(totalCredit, currency)}`,
+        `Pesa zilizopo ni chache kuliko deni iliyobaki: cash ${formatMoney(totalCash, currency)} dhidi ya credit ${formatMoney(totalCredit, currency)}`,
+        `النقد المتوفر أقل من الديون المستحقة: نقد ${formatMoney(totalCash, currency)} مقابل دين ${formatMoney(totalCredit, currency)}`,
+        `La trésorerie disponible est inférieure au crédit restant : cash ${formatMoney(totalCash, currency)} versus crédit ${formatMoney(totalCredit, currency)}`,
       ),
       details: { totalCash, totalCredit },
     });

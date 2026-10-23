@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from "next/server";
+import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
 import { dispatchVendorAlertSms } from "@/lib/dispatch-vendor-alerts";
@@ -19,7 +20,8 @@ export async function GET(request: NextRequest) {
       .where("vendor_id", "==", vendorId)
       .get();
     const transactions = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
-    const flags = evaluateRiskFlags(transactions, language);
+    const currency = await getVendorCurrency(vendorId);
+    const flags = evaluateRiskFlags(transactions, language, currency);
 
     after(() => {
       void dispatchVendorAlertSms(language, transactions, vendorId).catch((error) => {

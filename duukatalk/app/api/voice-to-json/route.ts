@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getAiProvider } from "@/lib/ai-provider";
 import {
@@ -178,6 +179,7 @@ export async function POST(
               requestedLanguage,
               transaction.customerName,
               outstandingCredit,
+              await getVendorCurrency(vendorId),
             ),
           },
           { status: 409 }

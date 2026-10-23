@@ -1,5 +1,6 @@
 import { Transaction } from "./schema";
 import { getDb } from "./firebase";
+import { formatMoney } from "./money";
 
 export interface FirestoreTransaction {
   id: string;
@@ -53,7 +54,10 @@ export function toFirestoreTransaction(
 /**
  * Builds a spoken-friendly summary of today's transactions.
  */
-export async function buildDailySummary(vendorId: string): Promise<string> {
+export async function buildDailySummary(
+  vendorId: string,
+  currency?: string,
+): Promise<string> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
@@ -71,10 +75,10 @@ export async function buildDailySummary(vendorId: string): Promise<string> {
   const totalOwed = credits.reduce((sum, t) => sum + t.total_amount, 0);
 
   const creditList = credits
-    .map((t) => `${t.customer_name ?? "someone"} owes ${t.total_amount} shillings`)
+    .map((t) => `${t.customer_name ?? "someone"} owes ${formatMoney(t.total_amount, currency)}`)
     .join(", ");
 
-  return `Today you made ${totalSales} shillings in sales. You are owed ${totalOwed} shillings in credit. ${
+  return `Today you made ${formatMoney(totalSales, currency)} in sales. You are owed ${formatMoney(totalOwed, currency)} in credit. ${
     creditList ? creditList + "." : "No outstanding credit today."
   }`;
 }

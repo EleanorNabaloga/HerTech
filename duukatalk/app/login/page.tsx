@@ -25,6 +25,7 @@ import {
   localeFor,
   translate,
 } from '@/lib/i18n';
+import { COUNTRIES } from '@/lib/money';
 
 
 
@@ -43,74 +44,8 @@ interface AuthApiResponse {
   currency?: string;
 }
 
-interface CountryOption {
-  name: string;
-  code: string;
-  currency: string;
-}
-
-const COUNTRY_OPTIONS: CountryOption[] = [
-  {
-    name: 'Uganda',
-    code: '+256',
-    currency: 'UGX',
-  },
-  {
-    name: 'Kenya',
-    code: '+254',
-    currency: 'KES',
-  },
-  {
-    name: 'Tanzania',
-    code: '+255',
-    currency: 'TZS',
-  },
-  {
-    name: 'Rwanda',
-    code: '+250',
-    currency: 'RWF',
-  },
-  {
-    name: 'Burundi',
-    code: '+257',
-    currency: 'BIF',
-  },
-  {
-    name: 'South Sudan',
-    code: '+211',
-    currency: 'SSP',
-  },
-  {
-    name: 'Democratic Republic of the Congo',
-    code: '+243',
-    currency: 'CDF',
-  },
-  {
-    name: 'Nigeria',
-    code: '+234',
-    currency: 'NGN',
-  },
-  {
-    name: 'Ghana',
-    code: '+233',
-    currency: 'GHS',
-  },
-  {
-    name: 'South Africa',
-    code: '+27',
-    currency: 'ZAR',
-  },
-  {
-    name: 'United Kingdom',
-    code: '+44',
-    currency: 'GBP',
-  },
-  {
-    name: 'United States',
-    code: '+1',
-    currency: 'USD',
-  },
-];
+// Shared with the server so currencies always match the country.
+const COUNTRY_OPTIONS = COUNTRIES;
 
 function LoginContent() {
   const router = useRouter();

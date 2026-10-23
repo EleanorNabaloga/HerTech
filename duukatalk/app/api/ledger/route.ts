@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
 import { toFirestoreTransaction } from "@/lib/firestore-transaction";
@@ -113,6 +114,7 @@ export async function POST(request: NextRequest) {
               language,
               customer,
               outstandingCredit,
+              await getVendorCurrency(vendorId),
             ),
           },
           { status: 409 }

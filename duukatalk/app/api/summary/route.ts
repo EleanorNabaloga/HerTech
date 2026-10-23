@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
 import {
@@ -75,7 +76,8 @@ export async function GET(request: NextRequest) {
     const guidance = buildLoanGuidance(
       totalSales,
       totalCreditOutstanding,
-      language
+      language,
+      await getVendorCurrency(vendorId)
     );
 
     return NextResponse.json({

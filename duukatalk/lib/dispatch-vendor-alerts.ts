@@ -1,5 +1,7 @@
 import { CREDIT_LIMIT, normalizeCustomerName } from "./credit";
 import { getDb } from "./firebase";
+import { getVendorCurrency } from "./auth";
+import { formatDay, formatMoney } from "./money";
 import {
   Language,
   RiskFlag,
@@ -104,22 +106,22 @@ async function claimAlert(
   });
 }
 
-function customerAlertMessage(flag: RiskFlag, language: Language): string | null {
+function customerAlertMessage(flag: RiskFlag, language: Language, currency: string): string | null {
   if (flag.type === "credit_risk") {
     const owed = Number(flag.details.amountOwed) || 0;
     return localize(
       language,
-      `DuukaTalk: You are over your vendor's UGX ${CREDIT_LIMIT.toLocaleString()} credit limit. You now owe UGX ${owed.toLocaleString()}. Please pay.`,
-      `DuukaTalk: Osukkiridde ekkomo ly'omubanja lya UGX ${CREDIT_LIMIT.toLocaleString()} okuva ku katale ko. Kati olina UGX ${owed.toLocaleString()}. Nsaba osasule.`,
-      `DuukaTalk: Umepita kikomo cha mkopo cha UGX ${CREDIT_LIMIT.toLocaleString()} kwa muuzaji wako. Sasa una deni la UGX ${owed.toLocaleString()}. Tafadhali lipa.`,
-      `DuukaTalk: تجاوزت الحد الائتماني الخاص بالبائع وهو UGX ${CREDIT_LIMIT.toLocaleString()}. أنت الآن مدين بـ UGX ${owed.toLocaleString()}. يرجى السداد.`,
-      `DuukaTalk: Vous avez dépassé la limite de crédit de votre vendeur de UGX ${CREDIT_LIMIT.toLocaleString()}. Vous devez maintenant UGX ${owed.toLocaleString()}. Veuillez payer.`,
+      `DuukaTalk: You are over your vendor's ${formatMoney(CREDIT_LIMIT, currency)} credit limit. You now owe ${formatMoney(owed, currency)}. Please pay.`,
+      `DuukaTalk: Osukkiridde ekkomo ly'omubanja lya ${formatMoney(CREDIT_LIMIT, currency)} okuva ku katale ko. Kati olina ${formatMoney(owed, currency)}. Nsaba osasule.`,
+      `DuukaTalk: Umepita kikomo cha mkopo cha ${formatMoney(CREDIT_LIMIT, currency)} kwa muuzaji wako. Sasa una deni la ${formatMoney(owed, currency)}. Tafadhali lipa.`,
+      `DuukaTalk: تجاوزت الحد الائتماني الخاص بالبائع وهو ${formatMoney(CREDIT_LIMIT, currency)}. أنت الآن مدين بـ ${formatMoney(owed, currency)}. يرجى السداد.`,
+      `DuukaTalk: Vous avez dépassé la limite de crédit de votre vendeur de ${formatMoney(CREDIT_LIMIT, currency)}. Vous devez maintenant ${formatMoney(owed, currency)}. Veuillez payer.`,
     );
   }
 
   if (flag.type === "due_date") {
     const item = String(flag.details.item ?? "your purchase");
-    const dueDate = String(flag.details.dueDate ?? "");
+    const dueDate = formatDay(String(flag.details.dueDate ?? ""));
     return localize(
       language,
       `DuukaTalk: Your payment for ${item} was due ${dueDate}. Please settle with your vendor.`,
@@ -211,7 +213,8 @@ export async function dispatchVendorAlertSms(
     rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
   }
 
-  const flags = evaluateRiskFlags(rows, language);
+  const currency = await getVendorCurrency(vendorId);
+  const flags = evaluateRiskFlags(rows, language, currency);
   const shopPhone = await vendorPhone(vendorId);
   let vendorAlerts = 0;
   let customerAlerts = 0;
@@ -230,7 +233,7 @@ export async function dispatchVendorAlertSms(
       if (sent) vendorAlerts += 1;
     }
 
-    const customerMessage = customerAlertMessage(flag, language);
+    const customerMessage = customerAlertMessage(flag, language, currency);
     const customerName = flag.details.customerName;
     if (customerMessage && typeof customerName === "string" && customerName.trim()) {
       const phone = await resolveCustomerPhone(customerName, null, vendorId);
