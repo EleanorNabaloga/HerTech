@@ -27,8 +27,10 @@ import {
   Mic,
   Moon,
   Package,
+  Play,
   Plus,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   Settings,
@@ -36,6 +38,7 @@ import {
   Sun,
   Trash2,
   TrendingUp,
+  TriangleAlert,
   User,
   X,
 } from 'lucide-react';
@@ -171,6 +174,7 @@ type CreditWarningPayload = {
   phone: string | null;
   language: Language;
   acknowledgedWarning: boolean;
+  clientId?: string;
 };
 
 interface CreditWarningState {
@@ -178,6 +182,8 @@ interface CreditWarningState {
   message: string;
   payload?: CreditWarningPayload;
   audioBlob?: Blob;
+  // The recording's id, kept so an approved upload can't be saved twice.
+  clientId?: string;
 }
 
 // --- HELPERS ---
@@ -204,25 +210,26 @@ interface OfflineSnapshot {
   risk: unknown;
 }
 
-function offlineSnapshotKey(): string | null {
+/** The vendor currently logged in on this phone (from login). */
+function storedVendorId(): string | null {
   try {
     const user = JSON.parse(
       window.localStorage.getItem('duukatalk-user') || 'null'
     ) as { vendorId?: string } | null;
-    return user?.vendorId
-      ? `duukatalk-offline-data-${user.vendorId}`
-      : null;
+    return user?.vendorId || null;
   } catch {
     return null;
   }
 }
 
-function readOfflineSnapshot(): OfflineSnapshot | null {
-  const key = offlineSnapshotKey();
-  if (!key) return null;
+function readOfflineSnapshot(
+  vendorId: string | null
+): OfflineSnapshot | null {
+  if (!vendorId) return null;
   try {
     return JSON.parse(
-      window.localStorage.getItem(key) || 'null'
+      window.localStorage.getItem(`duukatalk-offline-data-${vendorId}`) ||
+        'null'
     ) as OfflineSnapshot | null;
   } catch {
     return null;
@@ -230,18 +237,50 @@ function readOfflineSnapshot(): OfflineSnapshot | null {
 }
 
 function saveOfflineSnapshot(
+  vendorId: string | null,
   data: Omit<OfflineSnapshot, 'savedAt'>
 ): void {
-  const key = offlineSnapshotKey();
-  if (!key) return;
+  if (!vendorId) return;
   try {
     window.localStorage.setItem(
-      key,
+      `duukatalk-offline-data-${vendorId}`,
       JSON.stringify({ ...data, savedAt: new Date().toISOString() })
     );
   } catch {
     // Storage full or blocked: offline viewing just won't be available.
   }
+}
+
+// A request that hangs on a bad connection counts as failed after this, so
+// the saved offline copy can be shown instead of loading forever.
+const DATA_TIMEOUT_MS = 12_000;
+
+async function fetchJsonWithTimeout<T>(url: string): Promise<T | null> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), DATA_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) return null;
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+/**
+ * Upload failures worth retrying from the outbox: expired or switched login,
+ * timeouts, rate limits and server errors.
+ */
+function isRetryableStatus(status: number): boolean {
+  return (
+    status === 401 ||
+    status === 403 ||
+    status === 408 ||
+    status === 429 ||
+    status >= 500
+  );
 }
 
 function clearOfflineSnapshots(): void {
@@ -301,7 +340,6 @@ export default function DuukaTalkApp() {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingDebts, setIsLoadingDebts] = useState(false);
   const [creditWarning, setCreditWarning] = useState<CreditWarningState | null>(null);
-  const [audioTransactionLinkView, setAudioTransactionLinkView] = useState<string | null>(null);
 
   // --- EDIT TRANSACTION STATE ---
 
@@ -456,7 +494,14 @@ const [questionError, setQuestionError] =
     );
   };
 
+  const loadSeqRef = useRef(0);
+
   const loadApiData = async () => {
+    // Remember which load this is and whose data it fetches, so a slow
+    // response can't overwrite newer data or land in another shop's copy.
+    const loadId = ++loadSeqRef.current;
+    const vendorAtStart = storedVendorId();
+
     setIsLoadingData(true);
     setApiError('');
 
@@ -464,54 +509,45 @@ const [questionError, setQuestionError] =
     // French used to request 'MIX', which returned English + Luganda together.
     const routeLanguage = language;
 
-    const responses = await Promise.allSettled([
-      fetch('/api/ledger'),
-      fetch(`/api/summary?language=${routeLanguage}`),
-      fetch('/api/credit'),
-      fetch(`/api/risk?language=${routeLanguage}`),
-    ]);
-
-    let failedRoutes = 0;
-
-    const readJson = async <T,>(
-      result: PromiseSettledResult<Response>
-    ): Promise<T | null> => {
-      if (
-        result.status !== 'fulfilled' ||
-        !result.value.ok
-      ) {
-        failedRoutes += 1;
-        return null;
-      }
-
-      try {
-        return (await result.value.json()) as T;
-      } catch {
-        failedRoutes += 1;
-        return null;
-      }
-    };
-
     const [
       liveLedger,
       liveSummary,
       liveCredit,
       liveRisk,
     ] = await Promise.all([
-      readJson<{ transactions?: ApiTransaction[] }>(
-        responses[0]
+      fetchJsonWithTimeout<{ transactions?: ApiTransaction[] }>(
+        '/api/ledger'
       ),
-      readJson<ApiSummary>(responses[1]),
-      readJson<ApiDebt[]>(responses[2]),
-      readJson<RiskFlagsApiResponse>(responses[3]),
+      fetchJsonWithTimeout<ApiSummary>(
+        `/api/summary?language=${routeLanguage}`
+      ),
+      fetchJsonWithTimeout<ApiDebt[]>('/api/credit'),
+      fetchJsonWithTimeout<RiskFlagsApiResponse>(
+        `/api/risk?language=${routeLanguage}`
+      ),
     ]);
 
-    // Online: keep a copy on the phone. Offline: show that copy instead.
+    if (
+      loadId !== loadSeqRef.current ||
+      storedVendorId() !== vendorAtStart
+    ) {
+      return; // a newer load, or a different shop logged in meanwhile
+    }
+
+    const failedRoutes = [
+      liveLedger,
+      liveSummary,
+      liveCredit,
+      liveRisk,
+    ].filter((part) => part === null).length;
+
+    // Online: keep a copy on the phone. If anything failed, show that saved
+    // copy for every section, so totals and lists always agree.
     const snapshot =
-      failedRoutes > 0 ? readOfflineSnapshot() : null;
+      failedRoutes > 0 ? readOfflineSnapshot(vendorAtStart) : null;
 
     if (failedRoutes === 0) {
-      saveOfflineSnapshot({
+      saveOfflineSnapshot(vendorAtStart, {
         ledger: liveLedger,
         summary: liveSummary,
         credit: liveCredit,
@@ -519,18 +555,18 @@ const [questionError, setQuestionError] =
       });
     }
 
-    const ledgerData =
-      liveLedger ??
-      (snapshot?.ledger as { transactions?: ApiTransaction[] } | null) ??
-      null;
-    const summaryData =
-      liveSummary ?? (snapshot?.summary as ApiSummary | null) ?? null;
-    const creditData =
-      liveCredit ?? (snapshot?.credit as ApiDebt[] | null) ?? null;
-    const riskData =
-      liveRisk ??
-      (snapshot?.risk as RiskFlagsApiResponse | null) ??
-      null;
+    const ledgerData = snapshot
+      ? (snapshot.ledger as { transactions?: ApiTransaction[] } | null)
+      : liveLedger;
+    const summaryData = snapshot
+      ? (snapshot.summary as ApiSummary | null)
+      : liveSummary;
+    const creditData = snapshot
+      ? (snapshot.credit as ApiDebt[] | null)
+      : liveCredit;
+    const riskData = snapshot
+      ? (snapshot.risk as RiskFlagsApiResponse | null)
+      : liveRisk;
 
     if (ledgerData?.transactions) {
       const databaseTransactions: Transaction[] =
@@ -759,20 +795,11 @@ const [questionError, setQuestionError] =
         void loadApiData();
       }
 
-      if (result.unclear > 0) {
-        setMicError(
-          text(
-            'Some recordings could not be understood: {count}. Please record them again.',
-            { count: result.unclear }
-          )
-        );
-      }
-
-      if (result.dropped > 0) {
+      if (result.needsAttention > 0) {
         setFormMessage(
           text(
-            'Some entries could not be sent and were removed: {count}.',
-            { count: result.dropped }
+            'Some entries need your attention: {count}. See the Ledgers tab.',
+            { count: result.needsAttention }
           )
         );
       }
@@ -867,6 +894,9 @@ const [questionError, setQuestionError] =
     });
   };
 
+  const [isWarningBusy, setIsWarningBusy] = useState(false);
+
+  /** ✓ on the credit-limit warning: record a typed sale anyway. */
   const handleManualWarningProceed = async () => {
     if (!creditWarning || creditWarning.mode !== 'manual' || !creditWarning.payload) {
       return;
@@ -874,87 +904,212 @@ const [questionError, setQuestionError] =
 
     const payload = {
       ...creditWarning.payload,
+      clientId: creditWarning.payload.clientId ?? crypto.randomUUID(),
       acknowledgedWarning: true,
     };
 
-    try {
-      const response = await fetch('/api/ledger', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+    const keepForLater = async () => {
+      await outbox.queueSale({
+        id: payload.clientId,
+        customer: payload.customer,
+        item: payload.item,
+        amount: payload.amount,
+        paymentType: payload.paymentType,
+        dueDate: payload.dueDate,
+        phone: payload.phone,
       });
+      setFormMessage(
+        text(
+          'Saved on this phone. It will be sent automatically when you are back online.')
+      );
+    };
 
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-        id?: string;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to record transaction.');
+    setIsWarningBusy(true);
+    try {
+      let response: Response;
+      try {
+        response = await fetch('/api/ledger', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        outbox.markOffline();
+        await keepForLater();
+        return;
       }
 
+      if (!response.ok) {
+        if (isRetryableStatus(response.status)) {
+          await keepForLater();
+          return;
+        }
+        const data = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setFormMessage(
+          text('Entry could not be saved: {reason}', {
+            reason: shown(data?.error || 'Failed to record transaction.'),
+          })
+        );
+        return;
+      }
+
+      setFormData({
+        customer: '',
+        item: '',
+        amount: '',
+        paymentType: 'cash',
+      });
       setFormMessage(
         text(
           'Entry saved successfully after warning approval.')
       );
-
+      setActiveTab('ledgers');
       await loadApiData();
-    } catch (error) {
-      console.error('Manual warning approval failed:', error);
-      setFormMessage(
-        text(
-          'The warning-approved record could not be saved.')
-      );
     } finally {
+      setIsWarningBusy(false);
       setCreditWarning(null);
     }
   };
 
+  /** ✓ on the credit-limit warning: record a voice sale anyway. */
   const handleVoiceWarningProceed = async () => {
     if (!creditWarning || creditWarning.mode !== 'voice' || !creditWarning.audioBlob) {
       return;
     }
 
+    const audioBlob = creditWarning.audioBlob;
+    // Same id as the first attempt, so the server can't save it twice.
+    const clientId = creditWarning.clientId ?? crypto.randomUUID();
+
+    const keepForLater = async () => {
+      await outbox.queueVoiceNote(
+        audioBlob,
+        audioBlob.type || 'audio/webm',
+        clientId
+      );
+      setFormMessage(
+        text(
+          'Recording saved on this phone. It will be sent automatically when you are back online.')
+      );
+    };
+
     const formData = new FormData();
-    formData.append('audio', creditWarning.audioBlob, 'recording.webm');
+    formData.append('audio', audioBlob, 'recording.webm');
     formData.append('acknowledgedWarning', 'true');
     formData.append('language', language);
+    formData.append('clientId', clientId);
 
+    setIsWarningBusy(true);
     setIsProcessing(true);
     try {
-      const response = await fetch('/api/voice-to-json', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-
-        setMicError(errorData?.error || text(
-          'The voice service did not respond. Please try again.'));
-        setCreditWarning(null);
+      let response: Response;
+      try {
+        response = await fetch('/api/voice-to-json', {
+          method: 'POST',
+          body: formData,
+        });
+      } catch {
+        outbox.markOffline();
+        await keepForLater();
         return;
       }
 
-      const data = (await response.json()) as VoiceToJsonResponse;
-      if (!data.success || !data.transaction || !data.transactionId) {
+      if (!response.ok) {
+        if (isRetryableStatus(response.status)) {
+          await keepForLater();
+          return;
+        }
+        const errorData = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setMicError(errorData?.error || text(
+          'The voice service did not respond. Please try again.'));
+        return;
+      }
+
+      const data = (await response.json().catch(() => null)) as VoiceToJsonResponse | null;
+      if (!data || !data.success || !('transaction' in data) || !data.transactionId) {
         setMicError(text('Could not understand the recording. Please try again.'));
-        setCreditWarning(null);
         return;
       }
 
       setFormMessage(text('Voice record saved after warning approval.'));
-      setAudioTransactionLinkView(data.transactionId);
-      setCreditWarning(null);
+      setActiveTab('ledgers');
       await loadApiData();
-    } catch (error) {
-      console.error('Voice warning approval failed:', error);
-      setMicError(text('The voice record could not be saved after the warning approval.'));
     } finally {
+      setIsWarningBusy(false);
       setIsProcessing(false);
+      setCreditWarning(null);
     }
+  };
+
+  /** ✕ on the credit-limit warning: don't record it. */
+  const handleWarningRefuse = () => {
+    setCreditWarning(null);
+    setFormMessage(text('Not recorded.'));
+  };
+
+  const renderCreditWarningModal = () => {
+    if (!creditWarning) return null;
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="credit-warning-title"
+      >
+        <div
+          className={`w-full max-w-sm rounded-2xl p-4 shadow-xl ${
+            isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'
+          }`}
+        >
+          <h3
+            id="credit-warning-title"
+            className="flex items-center gap-2 text-sm font-bold text-red-700 dark:text-red-400"
+          >
+            <TriangleAlert size={18} />
+            {text('Exceeded loan limit')}
+          </h3>
+
+          <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+            {shown(creditWarning.message)}
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleWarningRefuse}
+              disabled={isWarningBusy}
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 text-xs font-semibold text-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50"
+            >
+              <X size={15} />
+              {text("Don't record")}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                void (creditWarning.mode === 'manual'
+                  ? handleManualWarningProceed()
+                  : handleVoiceWarningProceed())
+              }
+              disabled={isWarningBusy}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-red-600 px-3 py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {isWarningBusy ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <CheckCircle size={15} />
+              )}
+              {text('Record anyway')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const handleLanguageChange = (
@@ -1438,10 +1593,19 @@ const [questionError, setQuestionError] =
               paymentType,
               language,
               acknowledgedWarning: false,
+              clientId: offlineEntryId,
             },
           });
           return;
         }
+
+        // Temporary problem or expired login: keep it in the outbox (same
+        // id, so it can't be saved twice) and send it automatically later.
+        if (isRetryableStatus(response.status)) {
+          await queueForLater();
+          return;
+        }
+
         throw new Error(data?.error || 'Failed to save transaction.');
       }
 
@@ -1651,7 +1815,13 @@ const [questionError, setQuestionError] =
             mode: 'voice',
             message: errorData.error,
             audioBlob,
+            clientId: recordingId,
           });
+          return;
+        }
+
+        if (isRetryableStatus(response.status)) {
+          await queueRecording();
           return;
         }
 
@@ -2351,16 +2521,16 @@ console.log('Question audio:', {
           {outbox.status === 'synced' && <CheckCheck size={12} />}
 
           {outbox.status === 'offline'
-            ? outbox.pending.length > 0
+            ? outbox.waitingCount > 0
               ? text('Offline · {count} waiting', {
-                  count: outbox.pending.length,
+                  count: outbox.waitingCount,
                 })
               : text('Offline')
             : outbox.status === 'syncing'
               ? text('Sending…')
               : outbox.status === 'waiting'
                 ? text('{count} waiting to send', {
-                    count: outbox.pending.length,
+                    count: outbox.waitingCount,
                   })
                 : text('All sent')}
         </button>
@@ -2379,7 +2549,7 @@ console.log('Question audio:', {
       )}
 
       {/* Waiting entries need a fresh login before they can be sent */}
-      {outbox.needsLogin && outbox.pending.length > 0 && (
+      {outbox.needsLogin && outbox.waitingCount > 0 && (
         <p
           className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs text-amber-800"
           role="alert"
@@ -2953,62 +3123,131 @@ console.log('Question audio:', {
               </div>
             )}
 
-          {outbox.pending.map((entry) => (
-            <div
-              key={`pending-${entry.id}`}
-              className={`p-3 rounded-xl border border-dashed ${
-                isDarkMode
-                  ? 'bg-slate-800/40 border-slate-600'
-                  : 'bg-amber-50/60 border-amber-300'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 shrink-0 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 flex items-center justify-center">
-                    {entry.kind === 'voice' ? (
-                      <Mic size={15} />
-                    ) : (
-                      <Clock size={15} />
-                    )}
-                  </div>
+          {outbox.pending.map((entry) => {
+            const needsAttention = entry.status !== 'waiting';
 
-                  <div className="min-w-0">
-                    <h4 className="text-xs font-bold truncate">
-                      {entry.kind === 'voice'
-                        ? text('Voice note')
-                        : entry.customer}
-                    </h4>
+            return (
+              <div
+                key={`pending-${entry.id}`}
+                className={`p-3 rounded-xl border border-dashed ${
+                  needsAttention
+                    ? isDarkMode
+                      ? 'bg-red-950/30 border-red-800'
+                      : 'bg-red-50 border-red-300'
+                    : isDarkMode
+                      ? 'bg-slate-800/40 border-slate-600'
+                      : 'bg-amber-50/60 border-amber-300'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center ${
+                        needsAttention
+                          ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                      }`}
+                    >
+                      {needsAttention ? (
+                        <TriangleAlert size={15} />
+                      ) : entry.kind === 'voice' ? (
+                        <Mic size={15} />
+                      ) : (
+                        <Clock size={15} />
+                      )}
+                    </div>
 
-                    {entry.item && (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                        {entry.item}
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold truncate">
+                        {entry.kind === 'voice'
+                          ? text('Voice note')
+                          : entry.customer}
+                      </h4>
+
+                      {entry.item && (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                          {entry.item}
+                        </p>
+                      )}
+
+                      <p
+                        className={`text-[10px] mt-0.5 flex items-center gap-1 ${
+                          needsAttention
+                            ? 'text-red-700 dark:text-red-300'
+                            : 'text-amber-700 dark:text-amber-300'
+                        }`}
+                      >
+                        {!needsAttention && <Clock size={10} />}
+                        {entry.status === 'unclear'
+                          ? text("Couldn't understand this recording")
+                          : entry.status === 'rejected'
+                            ? text("Couldn't be saved: {reason}", {
+                                reason: shown(entry.lastError || ''),
+                              })
+                            : text('Waiting to send')}
+                        {' · '}
+                        {whenLabel(entry.createdAt)}
                       </p>
-                    )}
-
-                    <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5 flex items-center gap-1">
-                      <Clock size={10} />
-                      {text('Waiting to send')}
-                      {' · '}
-                      {whenLabel(entry.createdAt)}
-                    </p>
+                    </div>
                   </div>
+
+                  {typeof entry.amount === 'number' && (
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-bold">
+                        {formatCurrency(entry.amount, user.currency)}
+                      </div>
+                      <span className="text-[10px] text-slate-500">
+                        {entry.paymentType === 'credit'
+                          ? text('Credit')
+                          : text('Cash')}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {typeof entry.amount === 'number' && (
-                  <div className="text-right shrink-0">
-                    <div className="text-xs font-bold">
-                      {formatCurrency(entry.amount, user.currency)}
-                    </div>
-                    <span className="text-[10px] text-slate-500">
-                      {entry.paymentType === 'credit'
-                        ? text('Credit')
-                        : text('Cash')}
-                    </span>
+                {needsAttention && (
+                  <div className="mt-2 flex justify-end gap-1.5">
+                    {entry.kind === 'voice' && (
+                      <button
+                        type="button"
+                        onClick={() => void outbox.playVoiceNote(entry.id)}
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold dark:border-slate-600"
+                      >
+                        <Play size={12} />
+                        {text('Play')}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => void outbox.retryEntry(entry)}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold dark:border-slate-600"
+                    >
+                      <RotateCcw size={12} />
+                      {text('Try again')}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            text('Remove this entry from the phone? This cannot be undone.')
+                          )
+                        ) {
+                          void outbox.removeEntry(entry);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-[11px] font-semibold text-red-700 dark:border-red-800 dark:text-red-300"
+                    >
+                      <Trash2 size={12} />
+                      {text('Remove')}
+                    </button>
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {!isLoadingData &&
   filteredTransactions.map((tx) => (
@@ -4306,6 +4545,8 @@ console.log('Question audio:', {
 
       {/* EDIT MODAL */}
       {renderEditModal()}
+
+      {renderCreditWarningModal()}
 
       {/* DELETE CONFIRMATION MODAL */}
       {renderDeleteModal()}

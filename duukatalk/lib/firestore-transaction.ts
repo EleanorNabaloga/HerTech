@@ -24,6 +24,40 @@ export interface FirestoreTransaction {
   client_id?: string | null;
 }
 
+/**
+ * When an offline entry was actually recorded, so it lands on the right day.
+ * Accepts a past time up to a year back; anything else (missing, invalid,
+ * in the future) returns null and the server's own time is used.
+ */
+export function parseRecordedAt(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const time = Date.parse(value);
+  if (Number.isNaN(time)) return null;
+  const now = Date.now();
+  const yearMs = 365 * 24 * 60 * 60 * 1000;
+  if (time > now + 5 * 60 * 1000 || time < now - yearMs) return null;
+  return new Date(time).toISOString();
+}
+
+/**
+ * Offline entries name the vendor who recorded them. If the browser is now
+ * logged in as someone else, refuse, so the entry is never filed in another
+ * shop's ledger; the phone keeps it until the right vendor logs in.
+ */
+export function vendorMismatch(
+  expectedVendorId: unknown,
+  sessionVendorId: string,
+): boolean {
+  return (
+    typeof expectedVendorId === "string" &&
+    expectedVendorId !== "" &&
+    expectedVendorId !== sessionVendorId
+  );
+}
+
+export const VENDOR_MISMATCH_ERROR =
+  "This entry belongs to another shop. Log in as that shop to send it.";
+
 /** Accepts the outbox entry id sent by the app (a UUID), else null. */
 export function parseClientId(value: unknown): string | null {
   return typeof value === "string" && /^[A-Za-z0-9-]{8,100}$/.test(value)

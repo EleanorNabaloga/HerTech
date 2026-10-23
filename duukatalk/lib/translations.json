@@ -1481,18 +1481,6 @@
     "AR": "الولايات المتحدة",
     "FR": "États-Unis"
   },
-  "Some recordings could not be understood: {count}. Please record them again.": {
-    "LUG": "Amaloboozi agamu tegategeeddwa: {count}. Ddamu oyogere.",
-    "SW": "Baadhi ya rekodi hazikueleweka: {count}. Tafadhali rekodi tena.",
-    "AR": "تعذّر فهم بعض التسجيلات: {count}. يُرجى التسجيل مرة أخرى.",
-    "FR": "Certains enregistrements n'ont pas été compris : {count}. Veuillez les refaire."
-  },
-  "Some entries could not be sent and were removed: {count}.": {
-    "LUG": "Ebiwandiiko ebimu tebisobodde kusindikibwa era biggiddwawo: {count}.",
-    "SW": "Baadhi ya rekodi hazikuweza kutumwa na zimeondolewa: {count}.",
-    "AR": "تعذّر إرسال بعض القيود وتمت إزالتها: {count}.",
-    "FR": "Certaines entrées n'ont pas pu être envoyées et ont été retirées : {count}."
-  },
   "Saved on this phone. It will be sent automatically when you are back online.": {
     "LUG": "Kiterekeddwa ku ssimu eno. Kijja kusindikibwa ku lwakyo intaneti bw'eneedda.",
     "SW": "Imehifadhiwa kwenye simu hii. Itatumwa yenyewe mtandao ukirudi.",
@@ -1558,5 +1546,71 @@
     "SW": "Inasubiri kutumwa",
     "AR": "بانتظار الإرسال",
     "FR": "En attente d'envoi"
+  },
+  "Some entries need your attention: {count}. See the Ledgers tab.": {
+    "LUG": "Ebiwandiiko ebimu byetaaga okubirabako: {count}. Laba ku Bitabo.",
+    "SW": "Baadhi ya rekodi zinahitaji uangalizi wako: {count}. Angalia kwenye Madaftari.",
+    "AR": "بعض القيود تحتاج إلى انتباهك: {count}. راجع تبويب الدفاتر.",
+    "FR": "Certaines entrées demandent votre attention : {count}. Voir l'onglet Registres."
+  },
+  "Not recorded.": {
+    "LUG": "Tekiwandiikiddwa.",
+    "SW": "Haijarekodiwa.",
+    "AR": "لم يُسجَّل.",
+    "FR": "Non enregistré."
+  },
+  "Don't record": {
+    "LUG": "Towandiika",
+    "SW": "Usirekodi",
+    "AR": "لا تسجّل",
+    "FR": "Ne pas enregistrer"
+  },
+  "Record anyway": {
+    "LUG": "Wandiika wadde kiri kityo",
+    "SW": "Rekodi hata hivyo",
+    "AR": "سجّل على أي حال",
+    "FR": "Enregistrer quand même"
+  },
+  "Couldn't understand this recording": {
+    "LUG": "Eddoboozi lino terityegeerekese",
+    "SW": "Rekodi hii haikueleweka",
+    "AR": "تعذّر فهم هذا التسجيل",
+    "FR": "Enregistrement incompris"
+  },
+  "Couldn't be saved: {reason}": {
+    "LUG": "Tekisobodde kuterekebwa: {reason}",
+    "SW": "Haikuweza kuhifadhiwa: {reason}",
+    "AR": "تعذّر الحفظ: {reason}",
+    "FR": "Enregistrement impossible : {reason}"
+  },
+  "Play": {
+    "LUG": "Wuliriza",
+    "SW": "Cheza",
+    "AR": "تشغيل",
+    "FR": "Écouter"
+  },
+  "Try again": {
+    "LUG": "Ddamu ogezeeko",
+    "SW": "Jaribu tena",
+    "AR": "أعد المحاولة",
+    "FR": "Réessayer"
+  },
+  "Remove this entry from the phone? This cannot be undone.": {
+    "LUG": "Ggyawo ekiwandiiko kino ku ssimu? Kino tekisobola kuddizibwa.",
+    "SW": "Ondoa rekodi hii kwenye simu? Hili haliwezi kutenduliwa.",
+    "AR": "إزالة هذا القيد من الهاتف؟ لا يمكن التراجع عن ذلك.",
+    "FR": "Retirer cette entrée du téléphone ? Action irréversible."
+  },
+  "Remove": {
+    "LUG": "Ggyawo",
+    "SW": "Ondoa",
+    "AR": "إزالة",
+    "FR": "Retirer"
+  },
+  "This entry belongs to another shop. Log in as that shop to send it.": {
+    "LUG": "Ekiwandiiko kino kya dduuka ddala. Yingira nga edduuka eryo okukisindika.",
+    "SW": "Rekodi hii ni ya duka jingine. Ingia kama duka hilo ili kuituma.",
+    "AR": "هذا القيد يخص متجرًا آخر. سجّل الدخول بحساب ذلك المتجر لإرساله.",
+    "FR": "Cette entrée appartient à une autre boutique. Connectez-vous avec celle-ci pour l'envoyer."
   }
 }

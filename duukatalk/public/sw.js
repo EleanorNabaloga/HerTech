@@ -10,7 +10,7 @@
  *
  * Bump VERSION to discard all saved copies on the next visit.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const PAGE_CACHE = `duukatalk-pages-${VERSION}`;
 const STATIC_CACHE = `duukatalk-static-${VERSION}`;
 const PAGES = ["/", "/login", "/dashboard"];
@@ -67,12 +67,24 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+async function savedPage(pages, url) {
+  return (await pages.match(url.pathname)) || (await pages.match("/dashboard"));
+}
+
 async function networkFirstPage(request) {
   const url = new URL(request.url);
   const pages = await caches.open(PAGE_CACHE);
 
   try {
     const response = await fetch(request);
+
+    // Server trouble (5xx): show the saved page if there is one, so the
+    // app still opens during an outage.
+    if (response.status >= 500) {
+      const saved = await savedPage(pages, url);
+      if (saved) return saved;
+    }
+
     if (response.ok && PAGES.includes(url.pathname)) {
       await pages.put(url.pathname, response.clone());
       // Save the files this version of the page needs, for offline use.
@@ -94,8 +106,7 @@ async function networkFirstPage(request) {
     }
     return response;
   } catch {
-    const saved =
-      (await pages.match(url.pathname)) || (await pages.match("/dashboard"));
+    const saved = await savedPage(pages, url);
     return (
       saved ||
       new Response(

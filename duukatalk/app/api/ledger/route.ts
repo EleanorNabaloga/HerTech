@@ -3,9 +3,12 @@ import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
 import {
+  VENDOR_MISMATCH_ERROR,
   findByClientId,
   parseClientId,
+  parseRecordedAt,
   toFirestoreTransaction,
+  vendorMismatch,
 } from "@/lib/firestore-transaction";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
@@ -76,7 +79,16 @@ export async function POST(request: NextRequest) {
       language?: string;
       acknowledgedWarning?: boolean;
       clientId?: string;
+      expectedVendorId?: string;
+      recordedAt?: string;
     };
+
+    if (vendorMismatch(body.expectedVendorId, vendorId)) {
+      return NextResponse.json(
+        { error: VENDOR_MISMATCH_ERROR },
+        { status: 403 }
+      );
+    }
 
     // Offline entries carry the phone's id for them. If this one was
     // already saved (a retry after a dropped connection), return it.
@@ -141,7 +153,8 @@ export async function POST(request: NextRequest) {
     }
 
     const transactionId = await getNextTransactionId();
-    const timestamp = new Date().toISOString();
+    const timestamp =
+      parseRecordedAt(body.recordedAt) ?? new Date().toISOString();
 
     const transactionRef = getDb()
       .collection("transactions")

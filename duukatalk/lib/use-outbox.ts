@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  EntryStatus,
   QueuedTransaction,
   SyncResult,
   enqueueOfflineTransaction,
   enqueueOfflineVoiceNote,
+  getQueuedVoiceAudio,
   listOfflineTransactions,
   listOfflineVoiceNotes,
+  removeOfflineTransaction,
+  removeOfflineVoiceNote,
+  retryOutboxEntry,
   syncOutbox,
 } from './offline-queue';
 
@@ -15,6 +20,9 @@ import {
 export interface PendingEntry {
   id: string;
   kind: 'sale' | 'voice';
+  /** waiting: will be sent. unclear/rejected: set aside for the vendor. */
+  status: EntryStatus;
+  lastError?: string;
   customer?: string;
   item?: string;
   amount?: number;
@@ -64,6 +72,8 @@ export function useOutbox(options: {
             (sale): PendingEntry => ({
               id: sale.id,
               kind: 'sale',
+              status: sale.status ?? 'waiting',
+              lastError: sale.lastError,
               customer: sale.customer,
               item: sale.item,
               amount: sale.amount,
@@ -75,6 +85,8 @@ export function useOutbox(options: {
             (note): PendingEntry => ({
               id: note.id,
               kind: 'voice',
+              status: note.status ?? 'waiting',
+              lastError: note.lastError,
               createdAt: note.createdAt,
             }),
           ),
@@ -95,13 +107,13 @@ export function useOutbox(options: {
     setIsSyncing(true);
     try {
       const result = await syncOutbox(vendorId);
-      if (!result) return; // another sync is already running
+      if (!result) return; // already running, or asked to wait
 
       setNeedsLogin(result.needsLogin);
       setIsOnline(!result.offline);
 
       const sent = result.transactionsSynced + result.voiceNotesSynced;
-      if (sent > 0 || result.dropped > 0 || result.unclear > 0) {
+      if (sent > 0 || result.needsAttention > 0) {
         onSyncedRef.current(result);
       }
     } catch (error) {
@@ -113,7 +125,7 @@ export function useOutbox(options: {
   }, [vendorId, refreshPending]);
 
   const queueSale = useCallback(
-    async (entry: Omit<QueuedTransaction, 'vendorId' | 'language' | 'createdAt'>) => {
+    async (entry: Omit<QueuedTransaction, 'vendorId' | 'language' | 'createdAt' | 'version' | 'status'>) => {
       await enqueueOfflineTransaction({ ...entry, vendorId, language });
       await refreshPending();
       void syncNow();
@@ -129,6 +141,36 @@ export function useOutbox(options: {
     },
     [vendorId, language, refreshPending, syncNow],
   );
+
+  /** The vendor removes an entry (e.g. a recording that wasn't understood). */
+  const removeEntry = useCallback(
+    async (entry: PendingEntry) => {
+      if (entry.kind === 'sale') await removeOfflineTransaction(entry.id);
+      else await removeOfflineVoiceNote(entry.id);
+      await refreshPending();
+    },
+    [refreshPending],
+  );
+
+  /** The vendor puts a set-aside entry back in line to be sent. */
+  const retryEntry = useCallback(
+    async (entry: PendingEntry) => {
+      await retryOutboxEntry(entry.kind, entry.id);
+      await refreshPending();
+      void syncNow();
+    },
+    [refreshPending, syncNow],
+  );
+
+  /** Plays a queued voice note so the vendor can hear what was recorded. */
+  const playVoiceNote = useCallback(async (id: string) => {
+    const blob = await getQueuedVoiceAudio(id);
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    audio.onended = () => URL.revokeObjectURL(url);
+    await audio.play().catch(() => URL.revokeObjectURL(url));
+  }, []);
 
   // Send on load, whenever the connection or the app comes back.
   useEffect(() => {
@@ -157,28 +199,34 @@ export function useOutbox(options: {
     };
   }, [vendorId, refreshPending, syncNow]);
 
+  const waitingCount = pending.filter((entry) => entry.status === 'waiting').length;
+
   // Keep retrying while anything is waiting.
   useEffect(() => {
-    if (pending.length === 0 || needsLogin) return;
+    if (waitingCount === 0 || needsLogin) return;
     const timer = window.setInterval(() => void syncNow(), RETRY_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, [pending.length, needsLogin, syncNow]);
+  }, [waitingCount, needsLogin, syncNow]);
 
   const status: OutboxStatus = !isOnline
     ? 'offline'
-    : isSyncing && pending.length > 0
+    : isSyncing && waitingCount > 0
       ? 'syncing'
-      : pending.length > 0
+      : waitingCount > 0
         ? 'waiting'
         : 'synced';
 
   return {
     pending,
+    waitingCount,
     status,
     isOnline,
     needsLogin,
     queueSale,
     queueVoiceNote,
+    removeEntry,
+    retryEntry,
+    playVoiceNote,
     syncNow,
     markOffline: () => setIsOnline(false),
   };

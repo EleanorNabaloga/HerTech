@@ -9,10 +9,13 @@ import {
 } from "@/lib/schema";
 import { getDb } from "@/lib/firebase";
 import {
+  VENDOR_MISMATCH_ERROR,
   findByClientId,
   fromFirestoreTransaction,
   parseClientId,
+  parseRecordedAt,
   toFirestoreTransaction,
+  vendorMismatch,
 } from "@/lib/firestore-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
@@ -104,6 +107,14 @@ export async function POST(
 
   // A queued recording that was already saved (a retry after a dropped
   // connection) is answered from the database without processing it again.
+  if (vendorMismatch(formData.get("expectedVendorId"), vendorId)) {
+    return NextResponse.json(
+      { success: false, error: VENDOR_MISMATCH_ERROR },
+      { status: 403 }
+    );
+  }
+
+  const recordedAt = parseRecordedAt(formData.get("recordedAt"));
   const clientId = parseClientId(formData.get("clientId"));
   if (clientId) {
     try {
@@ -186,7 +197,7 @@ export async function POST(
     // 7. Create server-side timestamp
     // --------------------------------------------------
 
-    const timestamp = new Date().toISOString();
+    const timestamp = recordedAt ?? new Date().toISOString();
 
     // Convert the AI-extracted data into the application's
     // standard transaction format.
