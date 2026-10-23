@@ -1,25 +1,57 @@
+/*
+ * Offline outbox, WhatsApp style.
+ *
+ * Entries recorded without a connection are stored on the phone (IndexedDB)
+ * and sent oldest-first once the connection returns. Every entry keeps its
+ * own id, sent to the server as `clientId`; the server ignores an id it has
+ * already saved, so retries can never create duplicates. An entry is only
+ * removed from the outbox after the server confirms it.
+ */
+
 export interface QueuedTransaction {
   id: string;
+  vendorId?: string;
   customer: string;
   item: string;
   amount: number;
   paymentType: "cash" | "credit";
   dueDate?: string | null;
   phone?: string | null;
+  language?: string;
   createdAt: string;
+  attempts?: number;
 }
 
 export interface QueuedVoiceNote {
   id: string;
+  vendorId?: string;
   audioBlob: Blob;
   mimeType: string;
+  language?: string;
   createdAt: string;
+  attempts?: number;
+}
+
+export interface SyncResult {
+  transactionsSynced: number;
+  voiceNotesSynced: number;
+  /** Rejected by the server for good (e.g. invalid data). */
+  dropped: number;
+  /** Recordings the server could not turn into a sale. */
+  unclear: number;
+  /** The session expired; entries are kept until the vendor logs in. */
+  needsLogin: boolean;
+  /** The network failed part-way; remaining entries retry later. */
+  offline: boolean;
 }
 
 const DB_NAME = "duukatalk";
 const STORE_NAME = "queued_transactions";
 const VOICE_STORE_NAME = "queued_voice_notes";
-const DB_VERSION = 2; // bumped from 1 to add the voice-note store
+const DB_VERSION = 2;
+// Server errors (5xx) are retried; after this many the entry is dropped so a
+// broken one can't block the outbox forever. Network failures don't count.
+const MAX_SERVER_ATTEMPTS = 5;
 
 function openQueueDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -45,7 +77,32 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
-// --- Manual/typed transaction queue (existing) ---
+async function withStore<T>(
+  storeName: string,
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  const db = await openQueueDb();
+  try {
+    const tx = db.transaction(storeName, mode);
+    return await requestToPromise(run(tx.objectStore(storeName)));
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Entries saved before outbox entries were tagged with a vendor have no
+ * vendorId; they are sent by whoever is logged in (the old behaviour).
+ */
+function belongsTo(entry: { vendorId?: string }, vendorId: string): boolean {
+  return !entry.vendorId || entry.vendorId === vendorId;
+}
+
+const byOldest = (a: { createdAt: string }, b: { createdAt: string }) =>
+  a.createdAt.localeCompare(b.createdAt);
+
+// --- Typed sales ---
 
 export async function enqueueOfflineTransaction(
   entry: Omit<QueuedTransaction, "createdAt"> & { createdAt?: string },
@@ -54,205 +111,203 @@ export async function enqueueOfflineTransaction(
     ...entry,
     createdAt: entry.createdAt ?? new Date().toISOString(),
   };
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    await requestToPromise(tx.objectStore(STORE_NAME).put(record));
-    return record;
-  } finally {
-    db.close();
-  }
+  await withStore(STORE_NAME, "readwrite", (store) => store.put(record));
+  return record;
 }
 
-export async function listOfflineTransactions(): Promise<QueuedTransaction[]> {
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const rows = await requestToPromise(tx.objectStore(STORE_NAME).getAll());
-    return (rows as QueuedTransaction[]).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  } finally {
-    db.close();
-  }
+export async function listOfflineTransactions(vendorId?: string): Promise<QueuedTransaction[]> {
+  const rows = (await withStore(STORE_NAME, "readonly", (store) => store.getAll())) as QueuedTransaction[];
+  return rows
+    .filter((row) => !vendorId || belongsTo(row, vendorId))
+    .sort(byOldest);
 }
 
 export async function removeOfflineTransaction(id: string): Promise<void> {
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    await requestToPromise(tx.objectStore(STORE_NAME).delete(id));
-  } finally {
-    db.close();
-  }
+  await withStore(STORE_NAME, "readwrite", (store) => store.delete(id));
 }
 
-// Claim-first sync: remove each item from the queue BEFORE processing it.
-// If two syncs somehow overlap (React Strict Mode remount, duplicate
-// 'online' events, etc.), only one of them can ever claim a given item --
-// the second sees it already gone from the queue and skips it. If the
-// upload fails, the item is put back so it can be retried later.
-export async function syncOfflineTransactions(): Promise<{ synced: number; remaining: number }> {
-  const queued = await listOfflineTransactions();
-  let synced = 0;
-
-  for (const entry of [...queued].reverse()) {
-    // Claim: remove first, before the network call.
-    await removeOfflineTransaction(entry.id);
-
-    try {
-      const response = await fetch("/api/ledger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer: entry.customer,
-          item: entry.item,
-          amount: entry.amount,
-          paymentType: entry.paymentType,
-          dueDate: entry.dueDate,
-          phone: entry.phone,
-        }),
-      });
-
-      if (!response.ok) {
-        // Put it back so it can be retried on the next sync.
-        await enqueueOfflineTransaction(entry);
-        break;
-      }
-
-      synced += 1;
-    } catch (err) {
-      console.error(`Transaction ${entry.id} failed during sync, re-queueing:`, err);
-      await enqueueOfflineTransaction(entry);
-      break;
-    }
-  }
-
-  const remaining = (await listOfflineTransactions()).length;
-  return { synced, remaining };
-}
-
-// --- Voice-note queue (new) ---
-// Stores raw recorded audio when offline, since transcription/extraction
-// requires a live call to /api/voice-to-json and can't happen on-device.
+// --- Voice notes ---
 
 export async function enqueueOfflineVoiceNote(
   audioBlob: Blob,
   mimeType: string,
+  options: { vendorId?: string; language?: string; id?: string } = {},
 ): Promise<QueuedVoiceNote> {
   const record: QueuedVoiceNote = {
-    id: crypto.randomUUID(),
+    // Reuse the id of a failed live upload so a retry can't duplicate it.
+    id: options.id ?? crypto.randomUUID(),
+    vendorId: options.vendorId,
+    language: options.language,
     audioBlob,
     mimeType,
     createdAt: new Date().toISOString(),
   };
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(VOICE_STORE_NAME, "readwrite");
-    await requestToPromise(tx.objectStore(VOICE_STORE_NAME).put(record));
-    return record;
-  } finally {
-    db.close();
-  }
+  await withStore(VOICE_STORE_NAME, "readwrite", (store) => store.put(record));
+  return record;
 }
 
-export async function listOfflineVoiceNotes(): Promise<QueuedVoiceNote[]> {
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(VOICE_STORE_NAME, "readonly");
-    const rows = await requestToPromise(tx.objectStore(VOICE_STORE_NAME).getAll());
-    return (rows as QueuedVoiceNote[]).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  } finally {
-    db.close();
-  }
+export async function listOfflineVoiceNotes(vendorId?: string): Promise<QueuedVoiceNote[]> {
+  const rows = (await withStore(VOICE_STORE_NAME, "readonly", (store) => store.getAll())) as QueuedVoiceNote[];
+  return rows
+    .filter((row) => !vendorId || belongsTo(row, vendorId))
+    .sort(byOldest);
 }
 
 export async function removeOfflineVoiceNote(id: string): Promise<void> {
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(VOICE_STORE_NAME, "readwrite");
-    await requestToPromise(tx.objectStore(VOICE_STORE_NAME).delete(id));
-  } finally {
-    db.close();
-  }
+  await withStore(VOICE_STORE_NAME, "readwrite", (store) => store.delete(id));
 }
 
-async function enqueueExistingVoiceNote(note: QueuedVoiceNote): Promise<void> {
-  const db = await openQueueDb();
-  try {
-    const tx = db.transaction(VOICE_STORE_NAME, "readwrite");
-    await requestToPromise(tx.objectStore(VOICE_STORE_NAME).put(note));
-  } finally {
-    db.close();
-  }
+// --- Sync ---
+
+type Outcome = "sent" | "drop" | "unclear" | "login" | "offline" | "retry";
+
+function classify(status: number): Outcome {
+  if (status === 401) return "login";
+  if (status >= 500) return "retry";
+  return "drop";
 }
 
-// Sends each queued voice note through the same pipeline uploadRecording() uses:
-// a single call to /api/voice-to-json, which transcribes, extracts, and saves
-// the transaction to Firestore itself -- no separate /api/ledger call needed here.
-//
-// Claim-first pattern: each note is removed from the queue BEFORE it's sent.
-// This is what prevents the same recording from being processed twice if two
-// syncs ever overlap (e.g. React Strict Mode's dev-mode double-invoke, or the
-// 'online' event firing more than once). A genuine failure re-queues the note
-// so it isn't lost; an unusable note (bad audio, bad response) is dropped for
-// good so it doesn't block everything behind it forever.
-export async function syncOfflineVoiceNotes(): Promise<{ synced: number; remaining: number; failed: number }> {
-  const queued = await listOfflineVoiceNotes();
-  let synced = 0;
-  let failed = 0;
+async function sendTransaction(entry: QueuedTransaction): Promise<Outcome> {
+  let response: Response;
+  try {
+    response = await fetch("/api/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId: entry.id,
+        customer: entry.customer,
+        item: entry.item,
+        amount: entry.amount,
+        paymentType: entry.paymentType,
+        dueDate: entry.dueDate ?? null,
+        phone: entry.phone ?? null,
+        language: entry.language,
+        // The sale already happened while offline, so record it even if the
+        // customer is over the credit limit; the vendor still sees alerts.
+        acknowledgedWarning: true,
+      }),
+    });
+  } catch {
+    return "offline";
+  }
+  return response.ok ? "sent" : classify(response.status);
+}
 
-  for (const note of queued) {
-    // Claim: remove first, before the network call. If another sync run
-    // already claimed this note, listOfflineVoiceNotes() at the top of
-    // that other run wouldn't have included it in the first place, so
-    // there's no double-claim risk here -- only double-listing, which
-    // this removal step resolves.
-    await removeOfflineVoiceNote(note.id);
+async function sendVoiceNote(note: QueuedVoiceNote): Promise<Outcome> {
+  const form = new FormData();
+  form.append("audio", note.audioBlob, `queued-${note.id}.webm`);
+  form.append("clientId", note.id);
+  form.append("acknowledgedWarning", "true");
+  if (note.language) form.append("language", note.language);
 
-    try {
-      const formData = new FormData();
-      formData.append("audio", note.audioBlob, `queued-${note.id}.webm`);
+  let response: Response;
+  try {
+    response = await fetch("/api/voice-to-json", { method: "POST", body: form });
+  } catch {
+    return "offline";
+  }
 
-      const extractResponse = await fetch("/api/voice-to-json", {
-        method: "POST",
-        body: formData,
-      });
+  if (!response.ok) return classify(response.status);
 
-      if (!extractResponse.ok) {
-        const status = extractResponse.status;
-        const bodyText = await extractResponse.text().catch(() => "");
-        console.error(`Voice note ${note.id} failed at transcription:`, status, bodyText);
+  const data = (await response.json().catch(() => null)) as
+    | { success?: boolean; transaction?: unknown; needsClarification?: boolean }
+    | null;
+  return data?.success && data.transaction ? "sent" : "unclear";
+}
 
-        if (status >= 500) {
-          // Server/network problem -- likely transient. Re-queue for retry.
-          await enqueueExistingVoiceNote(note);
-        } else {
-          // Client-side rejection (bad request, auth, etc.) won't fix
-          // itself on retry -- drop it so it doesn't block the queue.
-          failed += 1;
-        }
-        continue;
+async function bumpAttempts<T extends { attempts?: number }>(
+  entry: T,
+  storeName: string,
+): Promise<boolean> {
+  const attempts = (entry.attempts ?? 0) + 1;
+  if (attempts >= MAX_SERVER_ATTEMPTS) return false;
+  await withStore(storeName, "readwrite", (store) => store.put({ ...entry, attempts }));
+  return true;
+}
+
+let syncRunning = false;
+
+async function runSync(vendorId: string): Promise<SyncResult> {
+  const result: SyncResult = {
+    transactionsSynced: 0,
+    voiceNotesSynced: 0,
+    dropped: 0,
+    unclear: 0,
+    needsLogin: false,
+    offline: false,
+  };
+
+  for (const entry of await listOfflineTransactions(vendorId)) {
+    const outcome = await sendTransaction(entry);
+    if (outcome === "sent") {
+      await removeOfflineTransaction(entry.id);
+      result.transactionsSynced += 1;
+    } else if (outcome === "drop") {
+      console.error(`Queued sale ${entry.id} was rejected; removing it.`);
+      await removeOfflineTransaction(entry.id);
+      result.dropped += 1;
+    } else if (outcome === "retry") {
+      if (!(await bumpAttempts(entry, STORE_NAME))) {
+        await removeOfflineTransaction(entry.id);
+        result.dropped += 1;
       }
-
-      const data = (await extractResponse.json().catch(() => null)) as
-        | { success?: boolean; transaction?: Record<string, unknown>; error?: string }
-        | null;
-      const transaction = data?.success ? data.transaction : null;
-
-      if (!transaction) {
-        console.error(`Voice note ${note.id} produced no transaction:`, data?.error);
-        failed += 1;
-        continue;
-      }
-
-      synced += 1;
-    } catch (err) {
-      // A thrown error here means the fetch itself failed -- genuinely
-      // offline or unreachable. Re-queue so it retries on the next sync.
-      console.error(`Voice note ${note.id} threw an error during sync, re-queueing:`, err);
-      await enqueueExistingVoiceNote(note);
+    } else if (outcome === "login") {
+      result.needsLogin = true;
+      return result;
+    } else {
+      result.offline = true;
+      return result;
     }
   }
 
-  const remaining = (await listOfflineVoiceNotes()).length;
-  return { synced, remaining, failed };
+  for (const note of await listOfflineVoiceNotes(vendorId)) {
+    const outcome = await sendVoiceNote(note);
+    if (outcome === "sent") {
+      await removeOfflineVoiceNote(note.id);
+      result.voiceNotesSynced += 1;
+    } else if (outcome === "unclear") {
+      await removeOfflineVoiceNote(note.id);
+      result.unclear += 1;
+    } else if (outcome === "drop") {
+      console.error(`Queued voice note ${note.id} was rejected; removing it.`);
+      await removeOfflineVoiceNote(note.id);
+      result.dropped += 1;
+    } else if (outcome === "retry") {
+      if (!(await bumpAttempts(note, VOICE_STORE_NAME))) {
+        await removeOfflineVoiceNote(note.id);
+        result.dropped += 1;
+      }
+    } else if (outcome === "login") {
+      result.needsLogin = true;
+      return result;
+    } else {
+      result.offline = true;
+      return result;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Sends everything waiting for this vendor. Only one sync runs at a time,
+ * across browser tabs too when the browser supports Web Locks; a call made
+ * while another sync is running returns null.
+ */
+export async function syncOutbox(vendorId: string): Promise<SyncResult | null> {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    return navigator.locks.request(
+      "duukatalk-outbox-sync",
+      { ifAvailable: true },
+      async (lock) => (lock ? runSync(vendorId) : null),
+    );
+  }
+
+  if (syncRunning) return null;
+  syncRunning = true;
+  try {
+    return await runSync(vendorId);
+  } finally {
+    syncRunning = false;
+  }
 }

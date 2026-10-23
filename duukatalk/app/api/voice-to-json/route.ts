@@ -8,7 +8,12 @@ import {
   toTransaction,
 } from "@/lib/schema";
 import { getDb } from "@/lib/firebase";
-import { toFirestoreTransaction } from "@/lib/firestore-transaction";
+import {
+  findByClientId,
+  fromFirestoreTransaction,
+  parseClientId,
+  toFirestoreTransaction,
+} from "@/lib/firestore-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
 import { getNextTransactionId } from "@/lib/transaction-id";
@@ -96,6 +101,32 @@ export async function POST(
   const mimeType = audioEntry.type || "audio/webm";
   const requestedLanguage = parseLanguage(formData.get("language")?.toString() ?? "EN");
   const acknowledgedWarning = formData.get("acknowledgedWarning") === "true";
+
+  // A queued recording that was already saved (a retry after a dropped
+  // connection) is answered from the database without processing it again.
+  const clientId = parseClientId(formData.get("clientId"));
+  if (clientId) {
+    try {
+      const existing = await findByClientId(vendorId, clientId);
+      if (existing) {
+        return NextResponse.json(
+          {
+            success: true,
+            transcript: existing.raw_transcript,
+            transaction: fromFirestoreTransaction(existing),
+            transactionId: existing.id,
+          },
+          { status: 200 }
+        );
+      }
+    } catch (error) {
+      console.error("Duplicate check failed:", error);
+      return NextResponse.json(
+        { success: false, error: "Could not check for an earlier upload" },
+        { status: 503 }
+      );
+    }
+  }
 
   // --------------------------------------------------
   // 4. Convert audio to a Buffer
@@ -213,7 +244,7 @@ export async function POST(
     // 10. Save transaction to Firestore
     // --------------------------------------------------
 
-    await docRef.set(firestoreTransaction);
+    await docRef.set({ ...firestoreTransaction, client_id: clientId });
 
     console.info("Transaction saved successfully:", {
       transactionId: docRef.id,

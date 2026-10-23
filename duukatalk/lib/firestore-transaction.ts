@@ -20,6 +20,50 @@ export interface FirestoreTransaction {
   timestamp: string;
   raw_transcript: string;
   confidence_flag: boolean;
+  /** Id the phone gave an offline entry; used to ignore repeat uploads. */
+  client_id?: string | null;
+}
+
+/** Accepts the outbox entry id sent by the app (a UUID), else null. */
+export function parseClientId(value: unknown): string | null {
+  return typeof value === "string" && /^[A-Za-z0-9-]{8,100}$/.test(value)
+    ? value
+    : null;
+}
+
+/**
+ * The transaction this vendor already saved for an outbox entry, if any.
+ * Offline entries can be sent more than once (a retry after a dropped
+ * connection); this makes the second upload a no-op instead of a duplicate.
+ */
+export async function findByClientId(
+  vendorId: string,
+  clientId: string,
+): Promise<FirestoreTransaction | null> {
+  const snapshot = await getDb()
+    .collection("transactions")
+    .where("vendor_id", "==", vendorId)
+    .where("client_id", "==", clientId)
+    .limit(1)
+    .get();
+  return snapshot.empty
+    ? null
+    : (snapshot.docs[0].data() as FirestoreTransaction);
+}
+
+/** Converts a stored transaction back to the app's Transaction shape. */
+export function fromFirestoreTransaction(row: FirestoreTransaction): Transaction {
+  return {
+    item: row.item,
+    quantity: row.quantity,
+    unit: row.unit,
+    unitPrice: row.unit_price,
+    customerName: row.customer_name,
+    paymentType: row.payment_type,
+    dueDate: row.due_date,
+    timestamp: row.timestamp,
+    totalAmount: row.total_amount,
+  };
 }
 
 export function toFirestoreTransaction(

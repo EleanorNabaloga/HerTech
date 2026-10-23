@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
-import { toFirestoreTransaction } from "@/lib/firestore-transaction";
+import {
+  findByClientId,
+  parseClientId,
+  toFirestoreTransaction,
+} from "@/lib/firestore-transaction";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 import { getNextTransactionId } from "@/lib/transaction-id";
@@ -71,7 +75,21 @@ export async function POST(request: NextRequest) {
       phone?: string | null;
       language?: string;
       acknowledgedWarning?: boolean;
+      clientId?: string;
     };
+
+    // Offline entries carry the phone's id for them. If this one was
+    // already saved (a retry after a dropped connection), return it.
+    const clientId = parseClientId(body.clientId);
+    if (clientId) {
+      const existing = await findByClientId(vendorId, clientId);
+      if (existing) {
+        return NextResponse.json(
+          { id: existing.id, transaction: existing, duplicate: true },
+          { status: 200 }
+        );
+      }
+    }
 
     const customer = (body.customer ?? body.customer_name)?.trim();
     const customerKey = `${vendorId}_${normalizeCustomerName(customer)}`;
@@ -149,7 +167,7 @@ export async function POST(request: NextRequest) {
       vendorId
     );
 
-    await transactionRef.set(firestoreTransaction);
+    await transactionRef.set({ ...firestoreTransaction, client_id: clientId });
 
     let outstandingCredit: number | undefined;
 

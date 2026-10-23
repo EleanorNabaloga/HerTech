@@ -4,21 +4,20 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
-import {
-  enqueueOfflineTransaction,
-  enqueueOfflineVoiceNote,
-  syncOfflineTransactions,
-  syncOfflineVoiceNotes,
-} from '@/lib/offline-queue';
+import type { SyncResult } from '@/lib/offline-queue';
+import { useOutbox } from '@/lib/use-outbox';
 
 import {
   AlertCircle,
   BarChart3,
   Bell,
   BookOpen,
+  CheckCheck,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
+  Clock,
+  CloudOff,
   CreditCard,
   DollarSign,
   Download,
@@ -29,6 +28,7 @@ import {
   Moon,
   Package,
   Plus,
+  RefreshCw,
   Save,
   Search,
   Settings,
@@ -194,6 +194,66 @@ function deriveInitials(name: string): string {
   return initials || '??';
 }
 
+// The last data loaded from the server, kept on the phone so the dashboard
+// still shows something offline. Stored per vendor and removed on logout.
+interface OfflineSnapshot {
+  savedAt: string;
+  ledger: unknown;
+  summary: unknown;
+  credit: unknown;
+  risk: unknown;
+}
+
+function offlineSnapshotKey(): string | null {
+  try {
+    const user = JSON.parse(
+      window.localStorage.getItem('duukatalk-user') || 'null'
+    ) as { vendorId?: string } | null;
+    return user?.vendorId
+      ? `duukatalk-offline-data-${user.vendorId}`
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function readOfflineSnapshot(): OfflineSnapshot | null {
+  const key = offlineSnapshotKey();
+  if (!key) return null;
+  try {
+    return JSON.parse(
+      window.localStorage.getItem(key) || 'null'
+    ) as OfflineSnapshot | null;
+  } catch {
+    return null;
+  }
+}
+
+function saveOfflineSnapshot(
+  data: Omit<OfflineSnapshot, 'savedAt'>
+): void {
+  const key = offlineSnapshotKey();
+  if (!key) return;
+  try {
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ ...data, savedAt: new Date().toISOString() })
+    );
+  } catch {
+    // Storage full or blocked: offline viewing just won't be available.
+  }
+}
+
+function clearOfflineSnapshots(): void {
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith('duukatalk-offline-data-'))
+      .forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // ignore
+  }
+}
+
 function isValidDate(value?: string | null): value is string {
   return Boolean(value) && !Number.isNaN(new Date(value as string).getTime());
 }
@@ -235,6 +295,8 @@ export default function DuukaTalkApp() {
   const [formMessage, setFormMessage] = useState('');
   const [summary, setSummary] = useState<ApiSummary | null>(null);
   const [apiError, setApiError] = useState('');
+  // When set, the dashboard is showing the offline copy saved at this time.
+  const [offlineSnapshotAt, setOfflineSnapshotAt] = useState<string | null>(null);
   const [riskFlags, setRiskFlags] = useState<RiskFlagNotification[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isLoadingDebts, setIsLoadingDebts] = useState(false);
@@ -431,10 +493,10 @@ const [questionError, setQuestionError] =
     };
 
     const [
-      ledgerData,
-      summaryData,
-      creditData,
-      riskData,
+      liveLedger,
+      liveSummary,
+      liveCredit,
+      liveRisk,
     ] = await Promise.all([
       readJson<{ transactions?: ApiTransaction[] }>(
         responses[0]
@@ -443,6 +505,32 @@ const [questionError, setQuestionError] =
       readJson<ApiDebt[]>(responses[2]),
       readJson<RiskFlagsApiResponse>(responses[3]),
     ]);
+
+    // Online: keep a copy on the phone. Offline: show that copy instead.
+    const snapshot =
+      failedRoutes > 0 ? readOfflineSnapshot() : null;
+
+    if (failedRoutes === 0) {
+      saveOfflineSnapshot({
+        ledger: liveLedger,
+        summary: liveSummary,
+        credit: liveCredit,
+        risk: liveRisk,
+      });
+    }
+
+    const ledgerData =
+      liveLedger ??
+      (snapshot?.ledger as { transactions?: ApiTransaction[] } | null) ??
+      null;
+    const summaryData =
+      liveSummary ?? (snapshot?.summary as ApiSummary | null) ?? null;
+    const creditData =
+      liveCredit ?? (snapshot?.credit as ApiDebt[] | null) ?? null;
+    const riskData =
+      liveRisk ??
+      (snapshot?.risk as RiskFlagsApiResponse | null) ??
+      null;
 
     if (ledgerData?.transactions) {
       const databaseTransactions: Transaction[] =
@@ -552,10 +640,15 @@ const [questionError, setQuestionError] =
       setRiskFlags([]);
     }
 
-    if (failedRoutes > 0) {
+    if (failedRoutes > 0 && snapshot) {
+      setOfflineSnapshotAt(snapshot.savedAt);
+    } else if (failedRoutes > 0) {
+      setOfflineSnapshotAt(null);
       setApiError(
         'Could not load live data. Please refresh and try again.'
       );
+    } else {
+      setOfflineSnapshotAt(null);
     }
 
     setIsLoadingData(false);
@@ -644,70 +737,53 @@ const [questionError, setQuestionError] =
   // LOAD REAL DATABASE DATA
   // =========================================================
 
-  const syncInFlightRef = useRef(false);
+  // WhatsApp-style outbox: entries recorded offline wait on the phone and
+  // are sent automatically once the connection is back.
+  const outbox = useOutbox({
+    vendorId: user.vendorId,
+    language,
+    onSynced: (result: SyncResult) => {
+      const sent =
+        result.transactionsSynced + result.voiceNotesSynced;
 
-  useEffect(() => {
-    const syncQueuedRecords = async () => {
-      if (!navigator.onLine || syncInFlightRef.current) {
-        return;
-      }
-
-      syncInFlightRef.current = true;
-
-      setFormMessage(
-        text(
-          'Syncing offline records...')
-      );
-
-      try {
-        const [transactionSync, voiceSync] = await Promise.all([
-          syncOfflineTransactions(),
-          syncOfflineVoiceNotes(),
-        ]);
-
-        if (
-          transactionSync.synced > 0 ||
-          voiceSync.synced > 0
-        ) {
-          setFormMessage(
-            text(
-              'Synced offline records to the ledger: {transactions} transactions, {notes} voice notes.',
-              {
-                transactions: transactionSync.synced,
-                notes: voiceSync.synced,
-              }
-            )
-          );
-        } else {
-          setFormMessage(
-            text(
-              'No offline records to sync.')
-          );
-        }
-
-        await loadApiData();
-      } catch (error) {
-        console.error('Failed to sync offline queue:', error);
+      if (sent > 0) {
         setFormMessage(
           text(
-            'Offline sync failed. It will retry automatically when the network is back.')
+            'Synced offline records to the ledger: {transactions} transactions, {notes} voice notes.',
+            {
+              transactions: result.transactionsSynced,
+              notes: result.voiceNotesSynced,
+            }
+          )
         );
-      } finally {
-        syncInFlightRef.current = false;
+        void loadApiData();
       }
-    };
 
-    const handleOnline = () => {
-      void syncQueuedRecords();
-    };
+      if (result.unclear > 0) {
+        setMicError(
+          text(
+            'Some recordings could not be understood: {count}. Please record them again.',
+            { count: result.unclear }
+          )
+        );
+      }
 
-    window.addEventListener('online', handleOnline);
+      if (result.dropped > 0) {
+        setFormMessage(
+          text(
+            'Some entries could not be sent and were removed: {count}.',
+            { count: result.dropped }
+          )
+        );
+      }
+    },
+  });
 
-    void syncQueuedRecords();
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
+  // Load (or reload, in the new language) the dashboard data.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadApiData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language]);
 
   // =========================================================
@@ -964,6 +1040,8 @@ const [questionError, setQuestionError] =
     await fetch('/api/auth/logout', {
       method: 'POST',
     });
+
+    clearOfflineSnapshots();
 
     window.localStorage.removeItem(
       'duukatalk-user'
@@ -1283,30 +1361,15 @@ const [questionError, setQuestionError] =
       // The manual form has no due date field; saving "now" made every
       // credit sale instantly overdue (and triggered overdue SMS).
       dueDate: null,
-      phone: user.phone || null,
-      createdAt: new Date().toISOString(),
+      // Never the vendor's own phone: that sent the customer's debt texts
+      // to the shop owner. The form doesn't collect a customer number yet.
+      phone: null,
     };
 
-    if (
-      typeof navigator !== 'undefined' &&
-      !navigator.onLine
-    ) {
-      await enqueueOfflineTransaction(queueEntry);
-
-      setTransactions((currentTransactions) => [
-        newTransaction,
-        ...currentTransactions,
-      ]);
-
-      if (newTransaction.type === 'credit') {
-        setDebts((currentDebts) => [
-          {
-            ...newTransaction,
-            dueDate: undefined,
-          },
-          ...currentDebts,
-        ]);
-      }
+    // Offline (or the upload fails): keep it in the outbox; it is sent
+    // automatically when the connection is back, like a WhatsApp message.
+    const queueForLater = async () => {
+      await outbox.queueSale(queueEntry);
 
       setFormData({
         customer: '',
@@ -1317,11 +1380,17 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'You are offline. The entry was saved to the offline queue.')
+          'Saved on this phone. It will be sent automatically when you are back online.')
       );
 
       setActiveTab('ledgers');
+    };
 
+    if (
+      typeof navigator !== 'undefined' &&
+      !navigator.onLine
+    ) {
+      await queueForLater();
       return;
     }
 
@@ -1333,10 +1402,15 @@ const [questionError, setQuestionError] =
       // The manual form has no due date field; saving "now" made every
       // credit sale instantly overdue (and triggered overdue SMS).
       dueDate: null,
-      phone: user.phone || null,
+      phone: null,
       language,
       acknowledgedWarning: false,
+      // Same id as the outbox entry, so a retry after a dropped connection
+      // is recognised by the server instead of saved twice.
+      clientId: offlineEntryId,
     };
+
+    let reachedServer = false;
 
     try {
       const response = await fetch('/api/ledger', {
@@ -1346,6 +1420,8 @@ const [questionError, setQuestionError] =
         },
         body: JSON.stringify(warningPayload),
       });
+
+      reachedServer = true;
 
       const data = (await response.json().catch(() => null)) as {
         error?: string;
@@ -1404,38 +1480,10 @@ const [questionError, setQuestionError] =
     } catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown save error';
 
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        await enqueueOfflineTransaction(queueEntry);
-
-        setTransactions((currentTransactions) => [
-          newTransaction,
-          ...currentTransactions,
-        ]);
-
-        if (newTransaction.type === 'credit') {
-          setDebts((currentDebts) => [
-            {
-              ...newTransaction,
-              dueDate: undefined,
-            },
-            ...currentDebts,
-          ]);
-        }
-
-        setFormData({
-          customer: '',
-          item: '',
-          amount: '',
-          paymentType: 'cash',
-        });
-
-        setFormMessage(
-          text(
-            'You are offline. The entry was saved to the offline queue.')
-        );
-
-        setActiveTab('ledgers');
-
+      // The request never reached the server: treat it like being offline.
+      if (!reachedServer) {
+        outbox.markOffline();
+        await queueForLater();
         return;
       }
 
@@ -1541,6 +1589,34 @@ const [questionError, setQuestionError] =
     // we try the real upload first and only fall back to the offline
     // queue if the fetch itself fails (a genuine network error).
 
+    // One id for this recording whether it is sent now or from the outbox,
+    // so it can never be saved twice.
+    const recordingId = crypto.randomUUID();
+    const mimeType = audioBlob.type || 'audio/webm';
+
+    const queueRecording = async () => {
+      await outbox.queueVoiceNote(audioBlob, mimeType, recordingId);
+
+      setFormMessage(
+        text(
+          'Recording saved on this phone. It will be sent automatically when you are back online.')
+      );
+
+      setActiveTab('ledgers');
+    };
+
+    if (
+      typeof navigator !== 'undefined' &&
+      !navigator.onLine
+    ) {
+      try {
+        await queueRecording();
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     try {
       const formData = new FormData();
 
@@ -1552,6 +1628,7 @@ const [questionError, setQuestionError] =
 
       formData.append('language', language);
       formData.append('acknowledgedWarning', 'false');
+      formData.append('clientId', recordingId);
 
       const response = await fetch(
         '/api/voice-to-json',
@@ -1758,15 +1835,10 @@ const [questionError, setQuestionError] =
       // actually returns.
       console.error('Voice upload failed, queueing offline:', error);
 
-      const mimeType = audioBlob.type || 'audio/webm';
+      outbox.markOffline();
 
       try {
-        await enqueueOfflineVoiceNote(audioBlob, mimeType);
-
-        setFormMessage(
-          text(
-            'You are offline. The recording is queued to sync when internet returns.')
-        );
+        await queueRecording();
       } catch (queueError) {
         console.error(
           'Failed to queue offline voice note:',
@@ -2255,6 +2327,69 @@ console.log('Question audio:', {
   // RECORD SCREEN
   // =========================================================
 
+  // Connection status and offline notices, shown above every tab.
+  const renderConnectionBar = () => (
+    <div className="space-y-2">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => void outbox.syncNow()}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+            outbox.status === 'offline'
+              ? 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+              : outbox.status === 'synced'
+                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300'
+                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300'
+          }`}
+          aria-live="polite"
+        >
+          {outbox.status === 'offline' && <CloudOff size={12} />}
+          {outbox.status === 'syncing' && (
+            <RefreshCw size={12} className="animate-spin" />
+          )}
+          {outbox.status === 'waiting' && <Clock size={12} />}
+          {outbox.status === 'synced' && <CheckCheck size={12} />}
+
+          {outbox.status === 'offline'
+            ? outbox.pending.length > 0
+              ? text('Offline · {count} waiting', {
+                  count: outbox.pending.length,
+                })
+              : text('Offline')
+            : outbox.status === 'syncing'
+              ? text('Sending…')
+              : outbox.status === 'waiting'
+                ? text('{count} waiting to send', {
+                    count: outbox.pending.length,
+                  })
+                : text('All sent')}
+        </button>
+      </div>
+
+      {/* Offline copy notice */}
+      {offlineSnapshotAt && (
+        <p
+          className="rounded-lg bg-slate-100 px-3 py-2 text-center text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+          role="status"
+        >
+          {text("You're offline. Showing data saved at {time}.", {
+            time: whenLabel(offlineSnapshotAt),
+          })}
+        </p>
+      )}
+
+      {/* Waiting entries need a fresh login before they can be sent */}
+      {outbox.needsLogin && outbox.pending.length > 0 && (
+        <p
+          className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs text-amber-800"
+          role="alert"
+        >
+          {text('Log in again to send your waiting entries. They are safe on this phone.')}
+        </p>
+      )}
+    </div>
+  );
+
   const renderRecordScreen = () => (
     <div className="space-y-4">
       {/* Profile Header */}
@@ -2277,7 +2412,7 @@ console.log('Question audio:', {
               </span>
 
               <span className="text-sm">
-                \ud83d\udc4b
+                👋
               </span>
             </div>
 
@@ -2287,9 +2422,7 @@ console.log('Question audio:', {
           </div>
         </div>
 
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-          {text('Connected')}
-        </span>
+
       </div>
 
       {/* Voice Record Hero */}
@@ -2341,6 +2474,7 @@ console.log('Question audio:', {
           {micStatusMessage}
         </p>
       </div>
+
 
       {/* API Error */}
       {apiError && (
@@ -2487,7 +2621,7 @@ console.log('Question audio:', {
           >
             <DollarSign size={16} />
 
-            \ud83d\udcb5{' '}
+            💵{' '}
             {text(
               'Cash')}
           </button>
@@ -2508,7 +2642,7 @@ console.log('Question audio:', {
           >
             <CreditCard size={16} />
 
-            \ud83d\udcd2{' '}
+            📒{' '}
             {text(
               'Credit')}
           </button>
@@ -2522,7 +2656,7 @@ console.log('Question audio:', {
 
           {text(
             'Save Entry')}{' '}
-          \u2713
+          ✓
         </button>
 
         {formMessage && (
@@ -2819,6 +2953,63 @@ console.log('Question audio:', {
               </div>
             )}
 
+          {outbox.pending.map((entry) => (
+            <div
+              key={`pending-${entry.id}`}
+              className={`p-3 rounded-xl border border-dashed ${
+                isDarkMode
+                  ? 'bg-slate-800/40 border-slate-600'
+                  : 'bg-amber-50/60 border-amber-300'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 shrink-0 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 flex items-center justify-center">
+                    {entry.kind === 'voice' ? (
+                      <Mic size={15} />
+                    ) : (
+                      <Clock size={15} />
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold truncate">
+                      {entry.kind === 'voice'
+                        ? text('Voice note')
+                        : entry.customer}
+                    </h4>
+
+                    {entry.item && (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                        {entry.item}
+                      </p>
+                    )}
+
+                    <p className="text-[10px] text-amber-700 dark:text-amber-300 mt-0.5 flex items-center gap-1">
+                      <Clock size={10} />
+                      {text('Waiting to send')}
+                      {' · '}
+                      {whenLabel(entry.createdAt)}
+                    </p>
+                  </div>
+                </div>
+
+                {typeof entry.amount === 'number' && (
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-bold">
+                      {formatCurrency(entry.amount, user.currency)}
+                    </div>
+                    <span className="text-[10px] text-slate-500">
+                      {entry.paymentType === 'credit'
+                        ? text('Credit')
+                        : text('Cash')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
           {!isLoadingData &&
   filteredTransactions.map((tx) => (
     <div
@@ -3077,7 +3268,7 @@ console.log('Question audio:', {
                       : 'border-slate-200 dark:border-slate-700 text-slate-500'
                   }`}
                 >
-                  \ud83d\udcb5{' '}
+                  💵{' '}
                   {text(
                     'Cash')}
                 </button>
@@ -3098,7 +3289,7 @@ console.log('Question audio:', {
                       : 'border-slate-200 dark:border-slate-700 text-slate-500'
                   }`}
                 >
-                  \ud83d\udcd2{' '}
+                  📒{' '}
                   {text(
                     'Credit')}
                 </button>
@@ -4044,6 +4235,8 @@ console.log('Question audio:', {
 
         {/* Dynamic View Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {renderConnectionBar()}
+
           {activeTab === 'record' &&
             renderRecordScreen()}
 
