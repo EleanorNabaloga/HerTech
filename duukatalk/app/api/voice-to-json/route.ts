@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { collection, doc, getDoc, setDoc } from "firebase/firestore";
+import { getSessionVendorId } from "@/lib/session";
 import { getAiProvider } from "@/lib/ai-provider";
 import {
   VoiceToJsonResponse,
   getMissingRequiredFields,
   toTransaction,
 } from "@/lib/schema";
-import { db } from "@/lib/firebase";
+import { getDb } from "@/lib/firebase";
 import { toFirestoreTransaction } from "@/lib/firestore-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
 import { getNextTransactionId } from "@/lib/transaction-id";
 import { CREDIT_LIMIT, normalizeCustomerName } from "@/lib/credit";
-import { localize, parseLanguage } from "@/lib/risk-flags";
+import { creditLimitWarning, parseLanguage } from "@/lib/risk-flags";
 
 export const runtime = "nodejs";
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
 const TRANSACTIONS_COLLECTION = "transactions";
 
@@ -27,7 +26,7 @@ export async function POST(
   // 1. Get the authenticated vendor ID
   // --------------------------------------------------
 
-  const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const vendorId = getSessionVendorId(request);
 
   if (!vendorId) {
     return NextResponse.json(
@@ -166,22 +165,19 @@ export async function POST(
 
     if (transaction.paymentType === "credit" && transaction.customerName) {
       const customerKey = `${vendorId}_${normalizeCustomerName(transaction.customerName)}`;
-      const customerSnap = await getDoc(doc(db, "customers", customerKey));
-      const outstandingCredit = customerSnap.exists()
-        ? Number(customerSnap.data().outstanding_credit || 0)
+      const customerSnap = await getDb().collection("customers").doc(customerKey).get();
+      const outstandingCredit = customerSnap.exists
+        ? Number(customerSnap.data()?.outstanding_credit || 0)
         : 0;
 
       if (outstandingCredit >= CREDIT_LIMIT && acknowledgedWarning !== true) {
         return NextResponse.json(
           {
             success: false,
-            error: localize(
+            error: creditLimitWarning(
               requestedLanguage,
-              `Warning: ${transaction.customerName} already has UGX ${outstandingCredit.toLocaleString()} in outstanding credit, above the UGX ${CREDIT_LIMIT.toLocaleString()} limit. Pause new lending and recover cash first. Use the tick to accept the warning and record, or use the cross to refuse.`,
-              `Okulabula: ${transaction.customerName} alina amabanja agasigadde UGX ${outstandingCredit.toLocaleString()}, okusukka ku kkomo lya UGX ${CREDIT_LIMIT.toLocaleString()}. Lekeka okukuza obulava obupya era funya ssente. Kozesa akatikkulu okukkiriza okulabula n'okuwandiika, oba akamukiye okugaana.`,
-              `Tahadhari: ${transaction.customerName} tayari ana deni la UGX ${outstandingCredit.toLocaleString()}, lililo juu ya kikomo cha UGX ${CREDIT_LIMIT.toLocaleString()}. Simama kutoa mkopo mpya na kukusanya pesa kwanza. Tumia alama ya tiki kukubali tahadhari na kurekodi, au alama ya x kukataa.`,
-              `تحذير: ${transaction.customerName} لديه بالفعل ديون مستحقة قدرها UGX ${outstandingCredit.toLocaleString()}، وهي أعلى من الحد UGX ${CREDIT_LIMIT.toLocaleString()}. أوقف منح القروض الجديدة وابدأ في تحصيل النقد أولاً. استخدم علامة صح للتأكيد أو علامة × للرفض.`,
-              `Avertissement : ${transaction.customerName} a déjà un crédit impayé de UGX ${outstandingCredit.toLocaleString()}, au-dessus de la limite de UGX ${CREDIT_LIMIT.toLocaleString()}. Suspendre tout nouveau prêt et récupérer l’argent d’abord. Utilisez la coche pour accepter l’avertissement et enregistrer, ou la croix pour refuser.`,
+              transaction.customerName,
+              outstandingCredit,
             ),
           },
           { status: 409 }
@@ -195,11 +191,9 @@ export async function POST(
 
     const transactionId = await getNextTransactionId();
 
-    const docRef = doc(
-      db,
-      TRANSACTIONS_COLLECTION,
-      transactionId
-    );
+    const docRef = getDb()
+      .collection(TRANSACTIONS_COLLECTION)
+      .doc(transactionId);
 
     // --------------------------------------------------
     // 9. Convert to Firestore format
@@ -217,7 +211,7 @@ export async function POST(
     // 10. Save transaction to Firestore
     // --------------------------------------------------
 
-    await setDoc(docRef, firestoreTransaction);
+    await docRef.set(firestoreTransaction);
 
     console.info("Transaction saved successfully:", {
       transactionId: docRef.id,

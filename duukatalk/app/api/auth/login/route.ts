@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginVendor } from "@/lib/auth";
+import { setSessionCookie } from "@/lib/session";
 
 export const runtime = "nodejs";
-
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,21 +61,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create the authentication cookie.
+    // Create the signed authentication cookie.
     const response = NextResponse.json(
       result,
       { status: 200 }
     );
 
-    response.cookies.set({
-      name: AUTH_COOKIE_NAME,
-      value: result.vendorId,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-    });
+    setSessionCookie(response, result.vendorId);
 
     return response;
   } catch (err) {

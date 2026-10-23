@@ -63,16 +63,37 @@ SUNBIRD_LANGUAGE=eng
 # Optional. Enables Gemini when Sunflower returns invalid or unparseable JSON.
 GEMINI_API_KEY=your_gemini_api_key
 
-# Firebase web application configuration.
-NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
+# Firebase Admin service account (Firebase console > Project settings >
+# Service accounts > Generate new private key). Copy project_id, client_email
+# and private_key from the downloaded JSON. Keep the quotes around the key.
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----
+"
+
+# Signs the login cookie. Any random string of 32+ characters, e.g.
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+SESSION_SECRET=long_random_string
+
+# Salt for hashing vendor PINs. Never change it once vendors exist, or
+# every existing PIN stops working.
+PIN_HASH_SALT=long_random_string
 ```
 
-Do not commit `.env.local` or expose provider credentials in client-side code. The `NEXT_PUBLIC_FIREBASE_*` values are Firebase web configuration values; access to Firestore must still be controlled with appropriate Firebase security rules.
+Do not commit `.env.local` or the service account JSON. All database access goes through the server with the Firebase Admin SDK, so the Firestore security rules should deny all direct access:
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
 
 ## How It Works
 
@@ -122,7 +143,16 @@ npm run dev      # Start the local development server
 npm run lint     # Run ESLint
 npm run build    # Create a production build
 npm run start    # Serve the production build
+npm run i18n:check  # Check every screen phrase has all four translations
 ```
+
+## Translations
+
+The interface supports English, Luganda, Kiswahili, Arabic (right-to-left) and French. Every phrase on screen goes through `text('English phrase')`, and `lib/translations.json` holds the Luganda, Kiswahili, Arabic and French versions keyed by the English text.
+
+- Put changing values in `{placeholders}`, e.g. `text('Hello {name}', { name })`. Never build the phrase with a template string; it can't be looked up.
+- After adding or changing a phrase, add it to `lib/translations.json` and run `npm run i18n:check`.
+- Translations were drafted without native-speaker review. Please have each language checked before relying on it.
 
 ## Troubleshooting
 

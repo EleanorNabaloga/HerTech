@@ -1,14 +1,12 @@
-import { doc, setDoc } from "firebase/firestore";
 import { dispatchVendorAlertSms, resolveCustomerPhone } from "./dispatch-vendor-alerts";
-import { db } from "./firebase";
+import { getDb } from "./firebase";
 import { Language, localize, parseLanguage } from "./risk-flags";
 import { sendSms } from "./sms";
 import { normalizeCustomerName } from "./credit";
 
 export async function rememberCustomerPhone(customerName: string, phone: string, vendorId?: string): Promise<void> {
   const customerKey = vendorId ? `${vendorId}_${normalizeCustomerName(customerName)}` : normalizeCustomerName(customerName);
-  await setDoc(
-    doc(db, "customers", customerKey),
+  await getDb().collection("customers").doc(customerKey).set(
     { phone, vendor_id: vendorId ?? null, customer_name: customerName.trim(), updated_at: new Date().toISOString() },
     { merge: true },
   );

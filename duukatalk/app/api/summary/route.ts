@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getSessionVendorId } from "@/lib/session";
+import { getDb } from "@/lib/firebase";
 import {
   buildLoanGuidance,
   isOutstandingCredit,
@@ -13,12 +8,11 @@ import {
   parseGuidanceLanguage,
 } from "@/lib/credit";
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 export async function GET(request: NextRequest) {
   try {
     // Get the logged-in vendor ID from the authentication cookie.
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(
@@ -34,12 +28,10 @@ export async function GET(request: NextRequest) {
     );
 
     // Fetch only transactions belonging to this vendor.
-    const transactionsQuery = query(
-      collection(db, "transactions"),
-      where("vendor_id", "==", vendorId)
-    );
-
-    const snapshot = await getDocs(transactionsQuery);
+    const snapshot = await getDb()
+      .collection("transactions")
+      .where("vendor_id", "==", vendorId)
+      .get();
     const transactions = snapshot.docs.map((doc) => doc.data());
 
     let totalSales = 0;
@@ -47,31 +39,9 @@ export async function GET(request: NextRequest) {
 
     const perCustomerCredit: Record<string, number> = {};
 
-    // Load customer profiles so existing outstanding balances
-    // are also available in the summary.
-    const customerSnapshot = await getDocs(
-      collection(db, "customers")
-    );
-
-    for (const customerDoc of customerSnapshot.docs) {
-      const customer = customerDoc.data();
-
-      const profileName = String(
-        customer.customer_name ||
-          customerDoc.id ||
-          "Unknown"
-      );
-
-      const profileKey = normalizeCustomerName(profileName);
-      const profileBalance = Number(
-        customer.outstanding_credit || 0
-      );
-
-      if (profileBalance > 0) {
-        perCustomerCredit[profileKey] = profileBalance;
-      }
-    }
-
+    // Balances come only from the transactions themselves. The saved
+    // customer balance already includes these same sales, so adding both
+    // counted every debt twice.
     for (const txn of transactions) {
       const amount = Number(txn.total_amount) || 0;
 
@@ -113,6 +83,7 @@ export async function GET(request: NextRequest) {
       totalCreditOutstanding,
       perCustomerCredit,
 
+      adviceCode: guidance.adviceCode,
       recommendedSavings: guidance.recommendedSavings,
       savingsPercent: guidance.savingsPercent,
       loanReadinessScore: guidance.loanReadinessScore,

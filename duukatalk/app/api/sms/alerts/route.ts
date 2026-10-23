@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionVendorId } from "@/lib/session";
 import { dispatchVendorAlertSms, getAlertSummary } from "@/lib/dispatch-vendor-alerts";
 import { isSmsConfigured } from "@/lib/sms";
 import { parseLanguage } from "@/lib/risk-flags";
@@ -14,15 +15,22 @@ async function dispatchAlertSms(request: NextRequest, bodyOverride?: { language?
   const queryLanguage = request.nextUrl.searchParams.get("language");
   const bodyLanguage = bodyOverride?.language;
   const language = parseLanguage(bodyLanguage || queryLanguage);
-  const vendorId = request.cookies.get("duukatalk_vendor_id")?.value;
+  const vendorId = getSessionVendorId(request);
+  if (!vendorId) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
 
   const sms = await dispatchVendorAlertSms(language, undefined, vendorId);
   return NextResponse.json({ ok: true, ...sms });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const summary = await getAlertSummary();
+    const vendorId = getSessionVendorId(request);
+    if (!vendorId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const summary = await getAlertSummary(vendorId);
     return NextResponse.json(summary);
   } catch (error) {
     console.error("Vendor alert summary lookup failed:", error);

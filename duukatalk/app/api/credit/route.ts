@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getSessionVendorId } from "@/lib/session";
+import { getDb } from "@/lib/firebase";
 import {
   isOutstandingCredit,
   normalizeCustomerName,
 } from "@/lib/credit";
 import { settleCustomerCredit } from "@/lib/updateCustomerCredit";
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 interface CreditTransaction {
   id: string;
@@ -33,7 +27,7 @@ interface CustomerBalance {
 export async function GET(request: NextRequest) {
   try {
     // Get the currently logged-in vendor
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(
@@ -43,12 +37,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Only fetch transactions belonging to this vendor
-    const transactionsQuery = query(
-      collection(db, "transactions"),
-      where("vendor_id", "==", vendorId)
-    );
-
-    const snapshot = await getDocs(transactionsQuery);
+    const snapshot = await getDb()
+      .collection("transactions")
+      .where("vendor_id", "==", vendorId)
+      .get();
 
     const transactions: CreditTransaction[] = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -108,7 +100,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(

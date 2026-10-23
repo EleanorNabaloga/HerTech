@@ -69,7 +69,11 @@ export function loanReadinessScore(totalSales: number, totalCreditOutstanding: n
   return Math.round(Math.min(100, Math.max(5, baseScore)));
 }
 
+/** Which coach message applies; the app translates it on screen. */
+export type AdviceCode = "stop_lending" | "cautious" | "healthy";
+
 export type LoanGuidance = {
+  adviceCode: AdviceCode;
   recommendedSavings: number;
   savingsPercent: number;
   creditToSalesRatio: number;
@@ -105,6 +109,11 @@ export function buildLoanGuidance(
   const savingsTargetMessage = localizeGuidance(language, savingsTargetMessageEn, savingsTargetMessageLug);
 
   let advice = savingsTargetMessage;
+  const adviceCode: AdviceCode = shouldStopLending
+    ? "stop_lending"
+    : creditToSalesRatio >= 0.3
+      ? "cautious"
+      : "healthy";
   if (shouldStopLending) {
     const english = `Stop giving new credit now. Credit is ${creditSharePercent}% of sales, which is too high. First collect debts and save ${savingsPercent}% of sales, about UGX ${savingsTarget.toLocaleString()}. A clear savings record can help banks like ABSA trust you.`;
     const luganda = `Lekeka okukuza obulava obupya kati. Amabanja gali ${creditSharePercent}% ku bigobawo, go maanyi. Funya amabanja era teeka ${savingsPercent}% ku bigobawo, nga buli UGX ${savingsTarget.toLocaleString()}. Ebiwandiiko by'okutereka ebirungi biyinza okukuza obwesigibwa bwa banki nga ABSA.`;
@@ -120,6 +129,7 @@ export function buildLoanGuidance(
   }
 
   return {
+    adviceCode,
     recommendedSavings,
     savingsPercent,
     creditToSalesRatio,

@@ -1,14 +1,5 @@
 import { createHash } from "crypto";
-import {
-  collection,
-  doc,
-  getDocs,
-  query,
-  where,
-  runTransaction,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "./firebase";
+import { getDb } from "./firebase";
 
 const VENDORS_COLLECTION = "vendors";
 const COUNTERS_COLLECTION = "counters";
@@ -69,19 +60,17 @@ function isValidPinFormat(pin: string): boolean {
 }
 
 async function getNextVendorId(): Promise<string> {
-  const counterRef = doc(
-    db,
-    COUNTERS_COLLECTION,
-    VENDOR_COUNTER_DOC
-  );
+  const db = getDb();
+  const counterRef = db
+    .collection(COUNTERS_COLLECTION)
+    .doc(VENDOR_COUNTER_DOC);
 
-  const nextNumber = await runTransaction(
-    db,
+  const nextNumber = await db.runTransaction(
     async (transaction) => {
       const counterSnap = await transaction.get(counterRef);
 
-      const current = counterSnap.exists()
-        ? (counterSnap.data().value as number)
+      const current = counterSnap.exists
+        ? (counterSnap.data()?.value as number)
         : 0;
 
       const next = current + 1;
@@ -104,16 +93,11 @@ async function findVendorByBusinessName(
 ): Promise<VendorRecord | null> {
   const businessNameLower = businessName.trim().toLowerCase();
 
-  const q = query(
-    collection(db, VENDORS_COLLECTION),
-    where(
-      "businessNameLower",
-      "==",
-      businessNameLower
-    )
-  );
-
-  const snapshot = await getDocs(q);
+  const snapshot = await getDb()
+    .collection(VENDORS_COLLECTION)
+    .where("businessNameLower", "==", businessNameLower)
+    .limit(1)
+    .get();
 
   if (snapshot.empty) {
     return null;
@@ -156,12 +140,14 @@ export async function signupVendor(params: {
     );
   }
 
+  // Hash before taking a vendor ID so a config error doesn't burn an ID.
+  const hashedPin = hashPin(pin);
   const vendorId = await getNextVendorId();
   const now = new Date().toISOString();
 
   const record: VendorRecord = {
     vendorId,
-    hashedPin: hashPin(pin),
+    hashedPin,
     businessName: businessName.trim(),
     businessNameLower: businessName
       .trim()
@@ -176,15 +162,11 @@ export async function signupVendor(params: {
     updatedAt: now,
   };
 
-  await runTransaction(db, async (transaction) => {
-    const vendorRef = doc(
-      db,
-      VENDORS_COLLECTION,
-      vendorId
-    );
-
-    transaction.set(vendorRef, record);
-  });
+  // create() fails instead of overwriting if the ID somehow already exists.
+  await getDb()
+    .collection(VENDORS_COLLECTION)
+    .doc(vendorId)
+    .create(record);
 
   return {
     success: true,
@@ -216,11 +198,9 @@ export async function loginVendor(
     };
   }
 
-  const vendorRef = doc(
-    db,
-    VENDORS_COLLECTION,
-    record.vendorId
-  );
+  const vendorRef = getDb()
+    .collection(VENDORS_COLLECTION)
+    .doc(record.vendorId);
 
   // Check whether the account is currently locked.
   if (record.lockedUntil) {
@@ -239,7 +219,7 @@ export async function loginVendor(
     }
 
     // Lockout has expired, so reset the failed attempts.
-    await updateDoc(vendorRef, {
+    await vendorRef.update({
       failedAttempts: 0,
       lockedUntil: null,
       updatedAt: now.toISOString(),
@@ -267,7 +247,7 @@ export async function loginVendor(
         now.getTime() + LOCKOUT_DURATION_MS
       ).toISOString();
 
-      await updateDoc(vendorRef, {
+      await vendorRef.update({
         failedAttempts: newFailedAttempts,
         lockedUntil,
         updatedAt: now.toISOString(),
@@ -281,7 +261,7 @@ export async function loginVendor(
       };
     }
 
-    await updateDoc(vendorRef, {
+    await vendorRef.update({
       failedAttempts: newFailedAttempts,
       updatedAt: now.toISOString(),
     });
@@ -295,7 +275,7 @@ export async function loginVendor(
   }
 
   // Successful login.
-  await updateDoc(vendorRef, {
+  await vendorRef.update({
     failedAttempts: 0,
     lockedUntil: null,
     updatedAt: new Date().toISOString(),
@@ -338,13 +318,10 @@ export async function updateVendorProfile(
     updates.phone = params.phone.trim();
   }
 
-  const vendorRef = doc(
-    db,
-    VENDORS_COLLECTION,
-    vendorId
-  );
-
-  await updateDoc(vendorRef, updates);
+  await getDb()
+    .collection(VENDORS_COLLECTION)
+    .doc(vendorId)
+    .update(updates);
 
   return {
     phone: params.phone?.trim() || "",

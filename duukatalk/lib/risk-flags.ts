@@ -49,6 +49,22 @@ export function localize(
   }
 }
 
+/** Shown when a customer is already over the credit limit (all languages). */
+export function creditLimitWarning(
+  language: Language,
+  customer: string,
+  outstandingCredit: number,
+): string {
+  return localize(
+    language,
+    `Warning: ${customer} already has UGX ${outstandingCredit.toLocaleString()} in outstanding credit, above the UGX ${CREDIT_LIMIT.toLocaleString()} limit. Pause new lending and recover cash first. Use the tick to accept the warning and record, or use the cross to refuse.`,
+    `Okulabula: ${customer} alina amabanja agasigadde UGX ${outstandingCredit.toLocaleString()}, okusukka ku kkomo lya UGX ${CREDIT_LIMIT.toLocaleString()}. Lekeka okukuza obulava obupya era funya ssente. Kozesa akatikkulu okukkiriza okulabula n'okuwandiika, oba akamukiye okugaana.`,
+    `Tahadhari: ${customer} tayari ana deni la UGX ${outstandingCredit.toLocaleString()}, lililo juu ya kikomo cha UGX ${CREDIT_LIMIT.toLocaleString()}. Simama kutoa mkopo mpya na kukusanya pesa kwanza. Tumia alama ya tiki kukubali tahadhari na kurekodi, au alama ya x kukataa.`,
+    `تحذير: ${customer} لديه بالفعل ديون مستحقة قدرها UGX ${outstandingCredit.toLocaleString()}، وهي أعلى من الحد UGX ${CREDIT_LIMIT.toLocaleString()}. أوقف منح القروض الجديدة وابدأ في تحصيل النقد أولاً. استخدم علامة صح للتأكيد أو علامة × للرفض.`,
+    `Avertissement : ${customer} a déjà un crédit impayé de UGX ${outstandingCredit.toLocaleString()}, au-dessus de la limite de UGX ${CREDIT_LIMIT.toLocaleString()}. Suspendre tout nouveau prêt et récupérer l’argent d’abord. Utilisez la coche pour accepter l’avertissement et enregistrer, ou la croix pour refuser.`,
+  );
+}
+
 export function parseLanguage(value: string | null | undefined): Language {
   if (value === "EN" || value === "LUG" || value === "SW" || value === "AR" || value === "FR" || value === "MIX") return value as Language;
   return "EN";

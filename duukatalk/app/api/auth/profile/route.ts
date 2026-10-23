@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSessionVendorId } from "@/lib/session";
 import { updateVendorProfile } from "@/lib/auth";
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 export async function PATCH(request: NextRequest) {
-  const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const vendorId = getSessionVendorId(request);
   if (!vendorId) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }

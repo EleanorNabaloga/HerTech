@@ -1,6 +1,5 @@
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { CREDIT_LIMIT, normalizeCustomerName } from "./credit";
-import { db } from "./firebase";
+import { getDb } from "./firebase";
 import {
   Language,
   RiskFlag,
@@ -13,12 +12,23 @@ import { sendSms } from "./sms";
 
 const SMS_ALERTS_COLLECTION = "sms_alerts";
 
-function vendorPhone(): string | null {
+/** The vendor's own phone from signup, falling back to AT_VENDOR_PHONE. */
+async function vendorPhone(vendorId: string): Promise<string | null> {
+  try {
+    const snap = await getDb().collection("vendors").doc(vendorId).get();
+    const phone = snap.exists ? snap.data()?.phone : undefined;
+    if (typeof phone === "string" && phone.trim()) return phone.trim();
+  } catch (error) {
+    console.error("Failed to look up vendor phone:", error);
+  }
   return process.env.AT_VENDOR_PHONE?.trim() || null;
 }
 
-function firestoreAlertId(flagId: string, channel: "vendor" | "customer"): string {
-  return `${channel}_${flagId}`.replace(/[/#[\]]/g, "_").slice(0, 700);
+// Scoped per vendor: flag IDs such as "credit_john" or "shop_cash_vs_credit"
+// are not unique across shops, and sharing one record made shops overwrite
+// each other's "already sent" marker, so texts were sent again.
+function firestoreAlertId(vendorId: string, flagId: string, channel: "vendor" | "customer"): string {
+  return `${vendorId}_${channel}_${flagId}`.replace(/[/#[\]]/g, "_").slice(0, 700);
 }
 
 export async function resolveCustomerPhone(
@@ -33,8 +43,8 @@ export async function resolveCustomerPhone(
       ? `${vendorId}_${normalizeCustomerName(customerName)}`
       : normalizeCustomerName(customerName);
 
-    const customerSnap = await getDoc(doc(db, "customers", scopedCustomerKey));
-    const stored = customerSnap.exists() ? customerSnap.data().phone : undefined;
+    const customerSnap = await getDb().collection("customers").doc(scopedCustomerKey).get();
+    const stored = customerSnap.exists ? customerSnap.data()?.phone : undefined;
     if (typeof stored === "string" && stored.trim()) return stored.trim();
   } catch (error) {
     console.error("Failed to look up customer phone by scoped customer record:", error);
@@ -45,13 +55,11 @@ export async function resolveCustomerPhone(
       return process.env.AT_DEMO_CUSTOMER_PHONE?.trim() || null;
     }
 
-    const customerQuery = query(
-      collection(db, "customers"),
-      where("vendor_id", "==", vendorId),
-      where("customer_name", "==", customerName.trim()),
-    );
-
-    const customerRows = await getDocs(customerQuery);
+    const customerRows = await getDb()
+      .collection("customers")
+      .where("vendor_id", "==", vendorId)
+      .where("customer_name", "==", customerName.trim())
+      .get();
     for (const row of customerRows.docs) {
       const rowPhone = row.data().phone;
       if (typeof rowPhone === "string" && rowPhone.trim()) {
@@ -65,22 +73,35 @@ export async function resolveCustomerPhone(
   return process.env.AT_DEMO_CUSTOMER_PHONE?.trim() || null;
 }
 
-async function alreadySent(docId: string, fingerprint: string): Promise<boolean> {
-  const snap = await getDoc(doc(db, SMS_ALERTS_COLLECTION, docId));
-  if (!snap.exists()) return false;
-  return snap.data().fingerprint === fingerprint;
-}
+/**
+ * Atomically claims an alert before sending it. Saving a sale and reloading
+ * the dashboard both start an alert sweep at the same moment; with a plain
+ * "check, send, then mark" both sweeps passed the check and each sent the
+ * text. Inside a transaction only one of them can claim it.
+ */
+async function claimAlert(
+  docId: string,
+  fingerprint: string,
+): Promise<{ claimed: boolean; previousFingerprint: string | null }> {
+  const db = getDb();
+  const ref = db.collection(SMS_ALERTS_COLLECTION).doc(docId);
 
-async function markSent(docId: string, fingerprint: string, extra: Record<string, unknown>): Promise<void> {
-  await setDoc(
-    doc(db, SMS_ALERTS_COLLECTION, docId),
-    {
-      fingerprint,
-      sent_at: new Date().toISOString(),
-      ...extra,
-    },
-    { merge: true },
-  );
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    const previous = snap.exists ? snap.data()?.fingerprint : undefined;
+    const previousFingerprint = typeof previous === "string" ? previous : null;
+
+    if (previousFingerprint === fingerprint) {
+      return { claimed: false, previousFingerprint };
+    }
+
+    transaction.set(
+      ref,
+      { fingerprint, status: "sending", claimed_at: new Date().toISOString() },
+      { merge: true },
+    );
+    return { claimed: true, previousFingerprint };
+  });
 }
 
 function customerAlertMessage(flag: RiskFlag, language: Language): string | null {
@@ -119,15 +140,31 @@ async function sendOnce(options: {
   message: string;
   extra: Record<string, unknown>;
 }): Promise<boolean> {
-  if (await alreadySent(options.docId, options.fingerprint)) return false;
+  const { claimed, previousFingerprint } = await claimAlert(options.docId, options.fingerprint);
+  if (!claimed) return false;
+
+  const ref = getDb().collection(SMS_ALERTS_COLLECTION).doc(options.docId);
   const result = await sendSms(options.phone, options.message);
-  if (!result.sent) return false;
-  await markSent(options.docId, options.fingerprint, options.extra);
+
+  if (!result.sent) {
+    // Release the claim so a later sweep can retry.
+    await ref.set({ fingerprint: previousFingerprint, status: "failed" }, { merge: true });
+    return false;
+  }
+
+  await ref.set(
+    { status: "sent", sent_at: new Date().toISOString(), ...options.extra },
+    { merge: true },
+  );
   return true;
 }
 
-export async function getAlertSummary(): Promise<{ vendorAlerts: number; customerAlerts: number; flags: number }> {
-  const snapshot = await getDocs(collection(db, SMS_ALERTS_COLLECTION));
+export async function getAlertSummary(vendorId: string): Promise<{ vendorAlerts: number; customerAlerts: number; flags: number }> {
+  const snapshot = await getDb()
+    .collection(SMS_ALERTS_COLLECTION)
+    .where("vendor_id", "==", vendorId)
+    .where("status", "==", "sent")
+    .get();
   let vendorAlerts = 0;
   let customerAlerts = 0;
   const flagIds = new Set<string>();
@@ -147,23 +184,35 @@ export async function dispatchVendorAlertSms(
   transactions?: RiskTransaction[],
   vendorId?: string,
 ): Promise<{ vendorAlerts: number; customerAlerts: number; flags: number }> {
+  // No vendor given (the daily cron): sweep each vendor separately so one
+  // shop's flags are never mixed with another's.
+  if (!vendorId) {
+    const vendors = await getDb().collection("vendors").get();
+    const total = { vendorAlerts: 0, customerAlerts: 0, flags: 0 };
+    for (const vendor of vendors.docs) {
+      try {
+        const result = await dispatchVendorAlertSms(language, undefined, vendor.id);
+        total.vendorAlerts += result.vendorAlerts;
+        total.customerAlerts += result.customerAlerts;
+        total.flags += result.flags;
+      } catch (error) {
+        console.error(`Alert sweep failed for ${vendor.id}:`, error);
+      }
+    }
+    return total;
+  }
+
   let rows = transactions;
   if (!rows) {
-    if (vendorId) {
-      const queryForVendor = query(
-        collection(db, "transactions"),
-        where("vendor_id", "==", vendorId),
-      );
-      const snapshot = await getDocs(queryForVendor);
-      rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
-    } else {
-      const snapshot = await getDocs(collection(db, "transactions"));
-      rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
-    }
+    const snapshot = await getDb()
+      .collection("transactions")
+      .where("vendor_id", "==", vendorId)
+      .get();
+    rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
   }
 
   const flags = evaluateRiskFlags(rows, language);
-  const shopPhone = vendorPhone();
+  const shopPhone = await vendorPhone(vendorId);
   let vendorAlerts = 0;
   let customerAlerts = 0;
 
@@ -172,11 +221,11 @@ export async function dispatchVendorAlertSms(
 
     if (shopPhone) {
       const sent = await sendOnce({
-        docId: firestoreAlertId(flag.id, "vendor"),
+        docId: firestoreAlertId(vendorId, flag.id, "vendor"),
         fingerprint,
         phone: shopPhone,
         message: `DuukaTalk alert: ${flag.message}`,
-        extra: { channel: "vendor", flag_id: flag.id, type: flag.type },
+        extra: { channel: "vendor", vendor_id: vendorId, flag_id: flag.id, type: flag.type },
       });
       if (sent) vendorAlerts += 1;
     }
@@ -187,11 +236,11 @@ export async function dispatchVendorAlertSms(
       const phone = await resolveCustomerPhone(customerName, null, vendorId);
       if (phone) {
         const sent = await sendOnce({
-          docId: firestoreAlertId(flag.id, "customer"),
+          docId: firestoreAlertId(vendorId, flag.id, "customer"),
           fingerprint,
           phone,
           message: customerMessage,
-          extra: { channel: "customer", flag_id: flag.id, type: flag.type, customer: customerName },
+          extra: { channel: "customer", vendor_id: vendorId, flag_id: flag.id, type: flag.type, customer: customerName },
         });
         if (sent) customerAlerts += 1;
       }

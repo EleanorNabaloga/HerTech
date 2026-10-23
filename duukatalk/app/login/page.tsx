@@ -19,6 +19,10 @@ import {
 import {
   LANGUAGE_OPTIONS,
   Language,
+  TranslationVars,
+  applyDocumentLanguage,
+  hasTranslation,
+  localeFor,
   translate,
 } from '@/lib/i18n';
 
@@ -166,10 +170,23 @@ function LoginContent() {
 
   const text = (
     english: string,
-    legacyLuganda?: string,
+    vars?: TranslationVars,
+  ) => translate(language, english, vars);
+
+  useEffect(() => {
+    applyDocumentLanguage(language);
+  }, [language]);
+
+  /** Server messages are English; show them translated, or a safe fallback. */
+  const serverError = (
+    message: string | undefined,
+    fallback: string,
   ) => {
-    void legacyLuganda;
-    return translate(language, english);
+    if (message && hasTranslation(message)) {
+      return text(message);
+    }
+    if (message) console.error('Auth error:', message);
+    return text(fallback);
   };
 
   const selectedCountry =
@@ -183,7 +200,7 @@ function LoginContent() {
     const unlockDate = new Date(lockedUntil);
 
     const timeLabel = unlockDate.toLocaleTimeString(
-      [],
+      localeFor(language),
       {
         hour: '2-digit',
         minute: '2-digit',
@@ -191,8 +208,8 @@ function LoginContent() {
     );
 
     return text(
-      `Too many incorrect attempts. Please try again after ${timeLabel}.`,
-      `Ogezezzaako emirundi mingi nga PIN ekyamu. Ddamu ogezeeko oluvannyuma lwa ${timeLabel}.`,
+      'Too many incorrect attempts. Please try again after {time}.',
+      { time: timeLabel },
     );
   };
 
@@ -207,9 +224,7 @@ function LoginContent() {
     if (!businessName.trim()) {
       setError(
         text(
-          'Enter your business name to continue.',
-          'Yingiza erinnya ly’ekibiina okweyongerayo.',
-        ),
+          'Enter your business name to continue.'),
       );
       return;
     }
@@ -217,9 +232,7 @@ function LoginContent() {
     if (!/^\d{4}$/.test(pin)) {
       setError(
         text(
-          'Your PIN must be exactly 4 digits.',
-          'PIN yo erina kuba nnamba 4 zokka.',
-        ),
+          'Your PIN must be exactly 4 digits.'),
       );
       return;
     }
@@ -228,9 +241,7 @@ function LoginContent() {
       if (!country) {
         setError(
           text(
-            'Select your country to continue.',
-            'Londa eggwanga lyo okweyongerayo.',
-          ),
+            'Select your country to continue.'),
         );
         return;
       }
@@ -240,9 +251,7 @@ function LoginContent() {
       if (!cleanedPhone) {
         setError(
           text(
-            'Enter your phone number to continue.',
-            'Yingiza ennamba yo ey’essimu okweyongerayo.',
-          ),
+            'Enter your phone number to continue.'),
         );
         return;
       }
@@ -250,9 +259,7 @@ function LoginContent() {
       if (cleanedPhone.length < 7) {
         setError(
           text(
-            'Enter a valid phone number.',
-            'Yingiza ennamba y’essimu entuufu.',
-          ),
+            'Enter a valid phone number.'),
         );
         return;
       }
@@ -289,19 +296,18 @@ function LoginContent() {
 
         if (!response.ok || !data?.success) {
           setError(
-            data?.error ||
-              text(
-                'Could not create your account. Please try again.',
-                'Tetusobodde kutondawo akaawunti yo. Ddamu ogezeeko.',
-              ),
+            serverError(
+              data?.error,
+              'Could not create your account. Please try again.',
+            ),
           );
           return;
         }
 
         setMessage(
           text(
-            `Your ${businessName.trim()} account is ready to go. You can now log in.`,
-            `Akaawunti ya ${businessName.trim()} eteekeddwa okukola. Kati osobola okuyingira.`,
+            'Your {shop} account is ready to go. You can now log in.',
+            { shop: businessName.trim() },
           ),
         );
 
@@ -341,22 +347,19 @@ function LoginContent() {
           'number'
         ) {
           setError(
-            text(
-              `Incorrect PIN. ${data.attemptsRemaining} attempt${
-                data.attemptsRemaining === 1
-                  ? ''
-                  : 's'
-              } remaining.`,
-              `PIN nkyamu. Ogenda kusigalako emirundi ${data.attemptsRemaining}.`,
-            ),
+            data.attemptsRemaining === 1
+              ? text('Incorrect PIN. 1 attempt remaining.')
+              : text(
+                  'Incorrect PIN. {count} attempts remaining.',
+                  { count: data.attemptsRemaining },
+                ),
           );
         } else {
           setError(
-            data?.error ||
-              text(
-                'Could not log in. Please try again.',
-                'Tetusobodde kuyingira. Ddamu ogezeeko.',
-              ),
+            serverError(
+              data?.error,
+              'Could not log in. Please try again.',
+            ),
           );
         }
 
@@ -393,9 +396,7 @@ function LoginContent() {
     } catch {
       setError(
         text(
-          'Something went wrong. Please check your connection and try again.',
-          'Wabaddewo ekizibu. Kebera network yo oyongere ogezeeko.',
-        ),
+          'Something went wrong. Please check your connection and try again.'),
       );
     } finally {
       setIsSubmitting(false);
@@ -433,9 +434,7 @@ function LoginContent() {
             </p>
             <p className="mt-1 text-xs font-medium text-blue-200">
               {text(
-                'Your shop, your story.',
-                'Ebyalo byo, ebyafaayo byo.',
-              )}
+                'Your shop, your story.')}
             </p>
           </div>
         </div>
@@ -443,23 +442,17 @@ function LoginContent() {
         <div className="relative z-10 max-w-md">
           <p className="mb-5 text-sm font-semibold uppercase tracking-[0.22em] text-amber-400">
             {text(
-              'Simple books. Strong business.',
-              'Ebitabo byawandiikibwa. Bizinensi ya maanyi.',
-            )}
+              'Simple books. Strong business.')}
           </p>
 
           <h1 className="text-4xl font-bold leading-tight xl:text-5xl">
             {text(
-              'Keep your business moving forward.',
-              'Tereeza bizinensi yo okudda mu maaso.',
-            )}
+              'Keep your business moving forward.')}
           </h1>
 
           <p className="mt-6 max-w-sm text-base leading-7 text-blue-100">
             {text(
-              "Record sales, track debts, and understand your shop's story in one friendly place.",
-              'Wandiika amagoba, teekateeka amabanja era otegeere ebyakolebwa mu katale mu kifo kimu ekyesigamizibwa.',
-            )}
+              "Record sales, track debts, and understand your shop's story in one friendly place.")}
           </p>
 
           <div className="mt-10 flex items-center gap-3 text-sm font-medium text-blue-100">
@@ -468,17 +461,13 @@ function LoginContent() {
             </span>
 
             {text(
-              'Built for everyday shop owners',
-              'Kuzimbiddwa abakola katale buli lunaku',
-            )}
+              'Built for everyday shop owners')}
           </div>
         </div>
 
         <p className="relative z-10 text-xs text-blue-300">
           {text(
-            '© 2025 DuukaTalk · Made for local businesses',
-            '© 2025 DuukaTalk · Kizimbiddwa bizinensi ezimu',
-          )}
+            '© 2025 DuukaTalk · Made for local businesses')}
         </p>
       </section>
 
@@ -489,7 +478,7 @@ function LoginContent() {
               className="sr-only"
               htmlFor="login-language-mode"
             >
-              Language
+              {text('Language')}
             </label>
 
             <select
@@ -530,9 +519,7 @@ function LoginContent() {
               </p>
               <p className="text-xs text-slate-500">
                 {text(
-                  'Your shop, your story.',
-                  'Ebyalo byo, ebyafaayo byo.',
-                )}
+                  'Your shop, your story.')}
               </p>
             </div>
           </div>
@@ -541,37 +528,25 @@ function LoginContent() {
             <p className="mb-3 text-sm font-semibold text-amber-600">
               {isSignup
                 ? text(
-                    'Welcome to DuukaTalk',
-                    'Tuyambalidde DuukaTalk',
-                  )
+                    'Welcome to DuukaTalk')
                 : text(
-                    'Welcome back',
-                    'Tuyanjula',
-                  )}
+                    'Welcome back')}
             </p>
 
             <h2 className="text-3xl font-bold tracking-tight text-blue-950 sm:text-4xl">
               {isSignup
                 ? text(
-                    'Set up your shop.',
-                    'Tegeka akatale ko.',
-                  )
+                    'Set up your shop.')
                 : text(
-                    'Log in to your shop.',
-                    'Yingira mu katale ko.',
-                  )}
+                    'Log in to your shop.')}
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-slate-500">
               {isSignup
                 ? text(
-                    'Create a quick, secure account for your business.',
-                    'Tondawo akaawunti eyanguyiriza n’eyokwerinda.',
-                  )
+                    'Create a quick, secure account for your business.')
                 : text(
-                    'Enter your details to pick up where you left off.',
-                    'Yingiza ebikukwatako okomekereza gy’oweddemu.',
-                  )}
+                    'Enter your details to pick up where you left off.')}
             </p>
           </div>
 
@@ -587,7 +562,7 @@ function LoginContent() {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {text('Sign up', 'Wandiise')}
+              {text('Sign up')}
             </button>
 
             <button
@@ -601,7 +576,7 @@ function LoginContent() {
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {text('Log in', 'Yingira')}
+              {text('Log in')}
             </button>
           </div>
 
@@ -616,9 +591,7 @@ function LoginContent() {
                 className="mb-2 block text-sm font-semibold text-slate-700"
               >
                 {text(
-                  'Business name',
-                  'Erinnya ly’ekibiina',
-                )}
+                  'Business name')}
               </label>
 
               <div className="relative">
@@ -638,9 +611,7 @@ function LoginContent() {
                     )
                   }
                   placeholder={text(
-                    "e.g. Mama Kintu's Shop",
-                    'eky. Katale ya Mama Kintu',
-                  )}
+                    "e.g. Mama Kintu's Shop")}
                   className="h-13 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10"
                 />
               </div>
@@ -654,9 +625,7 @@ function LoginContent() {
                     className="mb-2 block text-sm font-semibold text-slate-700"
                   >
                     {text(
-                      'Country',
-                      'Eggwanga',
-                    )}
+                      'Country')}
                   </label>
 
                   <select
@@ -673,7 +642,7 @@ function LoginContent() {
                           key={option.name}
                           value={option.name}
                         >
-                          {option.name} (
+                          {text(option.name)} (
                           {option.currency})
                         </option>
                       ),
@@ -681,10 +650,9 @@ function LoginContent() {
                   </select>
 
                   <p className="mt-2 text-xs text-slate-400">
-                    {text(
-                      `Currency: ${selectedCountry.currency}`,
-                      `Ssente: ${selectedCountry.currency}`,
-                    )}
+                    {text('Currency: {currency}', {
+                      currency: selectedCountry.currency,
+                    })}
                   </p>
                 </div>
 
@@ -694,9 +662,7 @@ function LoginContent() {
                     className="mb-2 block text-sm font-semibold text-slate-700"
                   >
                     {text(
-                      'Phone number',
-                      'Ennamba y’essimu',
-                    )}
+                      'Phone number')}
                   </label>
 
                   <div className="flex gap-2">
@@ -722,10 +688,9 @@ function LoginContent() {
                   </div>
 
                   <p className="mt-2 text-xs text-slate-400">
-                    {text(
-                      `Your number will be saved as ${selectedCountry.code}${phone || '...'}.`,
-                      `Ennamba yo ejja kuterekebwa nga ${selectedCountry.code}${phone || '...'}.`,
-                    )}
+                    {text('Your number will be saved as {phone}.', {
+                      phone: `${selectedCountry.code}${phone || '...'}`,
+                    })}
                   </p>
                 </div>
               </>
@@ -738,16 +703,12 @@ function LoginContent() {
                   className="block text-sm font-semibold text-slate-700"
                 >
                   {text(
-                    '4-digit PIN',
-                    'PIN ya namba 4',
-                  )}
+                    '4-digit PIN')}
                 </label>
 
                 <span className="text-xs text-slate-400">
                   {text(
-                    'Keep it private',
-                    'Eky’ekyama',
-                  )}
+                    'Keep it private')}
                 </span>
               </div>
 
@@ -794,13 +755,9 @@ function LoginContent() {
                   aria-label={
                     showPin
                       ? text(
-                          'Hide PIN',
-                          'Kisa PIN',
-                        )
+                          'Hide PIN')
                       : text(
-                          'Show PIN',
-                          'Laga PIN',
-                        )
+                          'Show PIN')
                   }
                   className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                 >
@@ -845,13 +802,9 @@ function LoginContent() {
                 <>
                   {isSignup
                     ? text(
-                        'Create my account',
-                        'Tondawo akaawunti yange',
-                      )
+                        'Create my account')
                     : text(
-                        'Log in',
-                        'Yingira',
-                      )}
+                        'Log in')}
 
                   <ArrowRight size={18} />
                 </>
@@ -861,9 +814,7 @@ function LoginContent() {
 
           <p className="mt-8 text-center text-xs leading-5 text-slate-400">
             {text(
-              'By continuing, you agree to keep your account details safe and private.',
-              'Bw’ogenda mu maaso, okiraba obuterevu mu kukiika ebikwata ku akaawunti yo.',
-            )}
+              'By continuing, you agree to keep your account details safe and private.')}
           </p>
         </div>
       </section>

@@ -1,6 +1,5 @@
 import { Transaction } from "./schema";
-import { db } from "./firebase";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { getDb } from "./firebase";
 
 export interface FirestoreTransaction {
   id: string;
@@ -58,12 +57,11 @@ export async function buildDailySummary(vendorId: string): Promise<string> {
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
-  const transactionsQuery = query(
-    collection(db, "transactions"),
-    where("vendor_id", "==", vendorId),
-    where("timestamp", ">=", startOfToday.toISOString())
-  );
-  const snapshot = await getDocs(transactionsQuery);
+  const snapshot = await getDb()
+    .collection("transactions")
+    .where("vendor_id", "==", vendorId)
+    .where("timestamp", ">=", startOfToday.toISOString())
+    .get();
 
   const transactions = snapshot.docs.map((doc) => doc.data() as FirestoreTransaction);
   const sales = transactions.filter((t) => t.payment_type === "cash");

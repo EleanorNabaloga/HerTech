@@ -1,168 +1,90 @@
+import translationData from './translations.json';
+
 export type Language = 'EN' | 'LUG' | 'SW' | 'AR' | 'FR';
 
+/*
+ * lib/translations.json maps each English phrase to its four translations.
+ * Keys may contain {placeholders}; translations must keep the same ones.
+ * `npm run i18n:check` fails if any phrase used in the app is missing.
+ */
+const TRANSLATIONS: Record<
+  string,
+  Record<Exclude<Language, 'EN'>, string>
+> = translationData;
+
+// Each language is listed in its own name so speakers can find it.
 export const LANGUAGE_OPTIONS: Array<{ value: Language; label: string }> = [
   { value: 'EN', label: 'English' },
   { value: 'LUG', label: 'Luganda' },
   { value: 'SW', label: 'Kiswahili' },
-  { value: 'AR', label: 'Arabic' },
-  { value: 'FR', label: 'French' },
+  { value: 'AR', label: 'العربية' },
+  { value: 'FR', label: 'Français' },
 ];
 
-const translations: Record<Exclude<Language, 'EN'>, Record<string, string>> = {
-  LUG: {
-    'Get Started': 'Tandika',
-    'Welcome to DuukaTalk': 'Tukwanirizza ku DuukaTalk',
-    'Your business, made simpler.': 'Bizinensi yo, eyanguyiziddwa.',
-    'Record with your voice': 'Wandiika n’eddoboozi lyo',
-    'Keep your ledger organized': 'Tegeka ebitabo byo',
-    'Understand your business': 'Tegeera bizinensi yo',
-    'Create an account or log in to continue.': 'Tondawo akaawunti oba yingira okweyongerayo.',
-    'Sign up': 'Wandiisa',
-    'Log in': 'Yingira',
-    'Business name': 'Erinnya lya bizinensi',
-    '4-digit PIN': 'PIN ya nnamba 4',
-    'Keep it private': 'Gikuume nga kyama',
-    'Set up your shop.': 'Tegeka akatale ko.',
-    'Log in to your shop.': 'Yingira mu katale ko.',
-    'Reports': 'Ripoota',
-    'Debts & Dues': 'Amabanja n’obukadde',
-    'Record': 'Wandiika',
-    'Ledgers': 'Ebitabo',
-    'Daily': 'Leero',
-    'Weekly': 'Buli wiiki',
-    'Monthly': 'Buli mwezi',
-    'Cash sales': 'Amagoba ga cash',
-    'Debt sales': 'Amagoba g’amabanja',
-    'Settings': 'Enteekateeka',
-    'Privacy': 'Obukuumi',
-    'Change PIN or phone number': 'Kyusa PIN oba ennamba y’essimu',
-    'Log out': 'Fuluma',
-    'Save changes': 'Tereka enkyukakyuka',
-    'Exceeded loan limit': 'Omusolo gw’obbanja gususse',
-    'Syncing offline records...': 'Teegeyuza ku database...',
-    'Synced offline transaction and voice note to the ledger.': 'Tukyuza offline transaction ne voice note ku ledger.',
-    'No offline records to sync.': 'Tewali offline records ku sync.',
-    'Offline sync failed. It will retry automatically when the network is back.': 'Offline sync yabaddewo ekizibu. Ejja kugezebwa nga network eddawo.',
-    'You are offline. The entry was saved to the offline queue.': 'Tewali network. Ekiwandiiko kiteekeddwa mu offline queue.',
-    'You are offline. The recording is queued to sync when internet returns.': 'Tewali network. Okurekoda kujja kuteekebwa mu queue okutuuka network lw’erabuka.',
-    'The recording could not be queued while offline.': 'Okurekoda tekusoboka kuteekebwa mu queue nga offline.',
-  },
-  SW: {
-    'Get Started': 'Anza',
-    'Welcome to DuukaTalk': 'Karibu DuukaTalk',
-    'Your business, made simpler.': 'Biashara yako, rahisi zaidi.',
-    'Record with your voice': 'Rekodi kwa sauti yako',
-    'Keep your ledger organized': 'Panga daftari lako',
-    'Understand your business': 'Elewa biashara yako',
-    'Create an account or log in to continue.': 'Fungua akaunti au ingia ili kuendelea.',
-    'Sign up': 'Jisajili',
-    'Log in': 'Ingia',
-    'Business name': 'Jina la biashara',
-    '4-digit PIN': 'PIN ya tarakimu 4',
-    'Keep it private': 'Iweke siri',
-    'Set up your shop.': 'Sanidi duka lako.',
-    'Log in to your shop.': 'Ingia kwenye duka lako.',
-    'Reports': 'Ripoti',
-    'Debts & Dues': 'Madeni na malipo',
-    'Record': 'Rekodi',
-    'Ledgers': 'Daftari',
-    'Daily': 'Kila siku',
-    'Weekly': 'Kila wiki',
-    'Monthly': 'Kila mwezi',
-    'Cash sales': 'Mauzo ya pesa taslimu',
-    'Debt sales': 'Mauzo ya deni',
-    'Settings': 'Mipangilio',
-    'Privacy': 'Faragha',
-    'Change PIN or phone number': 'Badilisha PIN au nambari ya simu',
-    'Log out': 'Toka',
-    'Save changes': 'Hifadhi mabadiliko',
-    'Exceeded loan limit': 'Umevuka kikomo cha mkopo',
-    'Syncing offline records...': 'Siniki data ya daftari ya nje ya mtandao...',
-    'Synced offline transaction and voice note to the ledger.': 'Imefanya usambazaji wa shughuli za nje ya mtandao na note ya sauti kwenye ledger.',
-    'No offline records to sync.': 'Hakuna rekodi za nje ya mtandao za kusawazisha.',
-    'Offline sync failed. It will retry automatically when the network is back.': 'Usawazishaji wa nje ya mtandao umefeli. Utaanza tena ukirudi mtandao.',
-    'You are offline. The entry was saved to the offline queue.': 'Uko nje ya mtandao. Kuingia kimehifadhiwa kwenye foleni ya nje ya mtandao.',
-    'You are offline. The recording is queued to sync when internet returns.': 'Uko nje ya mtandao. Kurekodi kumewekwa kwenye foleni kusawazishwa internet iriporudi.',
-    'The recording could not be queued while offline.': 'Kurekodi hakuweza kuwekwa kwenye foleni wakati umejikita nje ya mtandao.',
-  },
-  AR: {
-    'Get Started': 'ابدأ',
-    'Welcome to DuukaTalk': 'مرحبًا بك في DuukaTalk',
-    'Your business, made simpler.': 'اجعل عملك أكثر سهولة.',
-    'Record with your voice': 'سجّل بصوتك',
-    'Keep your ledger organized': 'نظّم دفتر حساباتك',
-    'Understand your business': 'افهم عملك',
-    'Create an account or log in to continue.': 'أنشئ حسابًا أو سجّل الدخول للمتابعة.',
-    'Sign up': 'إنشاء حساب',
-    'Log in': 'تسجيل الدخول',
-    'Business name': 'اسم النشاط التجاري',
-    '4-digit PIN': 'رمز PIN من 4 أرقام',
-    'Keep it private': 'احتفظ به سريًا',
-    'Set up your shop.': 'أنشئ متجرك.',
-    'Log in to your shop.': 'سجّل الدخول إلى متجرك.',
-    'Reports': 'التقارير',
-    'Debts & Dues': 'الديون والمستحقات',
-    'Record': 'تسجيل',
-    'Ledgers': 'دفاتر الحسابات',
-    'Daily': 'يومي',
-    'Weekly': 'أسبوعي',
-    'Monthly': 'شهري',
-    'Cash sales': 'مبيعات نقدية',
-    'Debt sales': 'مبيعات آجلة',
-    'Settings': 'الإعدادات',
-    'Privacy': 'الخصوصية',
-    'Change PIN or phone number': 'تغيير الرمز أو رقم الهاتف',
-    'Log out': 'تسجيل الخروج',
-    'Save changes': 'حفظ التغييرات',
-    'Exceeded loan limit': 'تم تجاوز حد القرض',
-    'Syncing offline records...': 'مزامنة السجلات خارج الاتصال...',
-    'Synced offline transaction and voice note to the ledger.': 'تمت مزامنة المعاملة الصوتية خارج الاتصال مع دفتر الحساب.',
-    'No offline records to sync.': 'لا توجد سجلات خارج الاتصال للمزامنة.',
-    'Offline sync failed. It will retry automatically when the network is back.': 'فشل مزامنة السجلات خارج الاتصال. سيُعيد المحاولة تلقائيًا عند عودة الشبكة.',
-    'You are offline. The entry was saved to the offline queue.': 'أنت خارج الاتصال. تم حفظ البند في قائمة الانتظار.',
-    'You are offline. The recording is queued to sync when internet returns.': 'أنت خارج الاتصال. سيتم وضع التسجيل في قائمة الانتظار عند عودة الإنترنت.',
-    'The recording could not be queued while offline.': 'تعذر وضع التسجيل في قائمة الانتظار أثناء الاتصال المنقطع.',
-  },
-  FR: {
-    'Get Started': 'Commencer',
-    'Welcome to DuukaTalk': 'Bienvenue sur DuukaTalk',
-    'Your business, made simpler.': 'Votre activité, simplifiée.',
-    'Record with your voice': 'Enregistrez avec votre voix',
-    'Keep your ledger organized': 'Gardez votre registre organisé',
-    'Understand your business': 'Comprenez votre activité',
-    'Create an account or log in to continue.': 'Créez un compte ou connectez-vous pour continuer.',
-    'Sign up': 'Créer un compte',
-    'Log in': 'Se connecter',
-    'Business name': 'Nom de l’entreprise',
-    '4-digit PIN': 'PIN à 4 chiffres',
-    'Keep it private': 'Gardez-le privé',
-    'Set up your shop.': 'Configurez votre boutique.',
-    'Log in to your shop.': 'Connectez-vous à votre boutique.',
-    'Reports': 'Rapports',
-    'Debts & Dues': 'Dettes et échéances',
-    'Record': 'Enregistrer',
-    'Ledgers': 'Registres',
-    'Daily': 'Quotidien',
-    'Weekly': 'Hebdomadaire',
-    'Monthly': 'Mensuel',
-    'Cash sales': 'Ventes au comptant',
-    'Debt sales': 'Ventes à crédit',
-    'Settings': 'Paramètres',
-    'Privacy': 'Confidentialité',
-    'Change PIN or phone number': 'Modifier le PIN ou le téléphone',
-    'Log out': 'Se déconnecter',
-    'Save changes': 'Enregistrer les modifications',
-    'Exceeded loan limit': 'Limite de crédit dépassée',
-    'Syncing offline records...': 'Synchronisation des enregistrements hors ligne...',
-    'Synced offline transaction and voice note to the ledger.': 'Transaction hors ligne et note vocale synchronisées au registre.',
-    'No offline records to sync.': 'Aucun enregistrement hors ligne à synchroniser.',
-    'Offline sync failed. It will retry automatically when the network is back.': 'La synchronisation hors ligne a échoué. Elle sera retentée automatiquement dès que le réseau reviendra.',
-    'You are offline. The entry was saved to the offline queue.': 'Vous êtes hors ligne. L’entrée a été enregistrée dans la file hors ligne.',
-    'You are offline. The recording is queued to sync when internet returns.': 'Vous êtes hors ligne. L’enregistrement est placé dans la file pour synchronisation à la reprise Internet.',
-    'The recording could not be queued while offline.': 'L’enregistrement n’a pas pu être placé dans la file quand le système était hors ligne.',
-  },
-};
+export type TranslationVars = Record<string, string | number>;
 
-export function translate(language: Language, english: string): string {
-  return language === 'EN' ? english : translations[language][english] || english;
+const warnedMissing = new Set<string>();
+
+function fill(template: string, vars?: TranslationVars): string {
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in vars ? String(vars[key]) : match,
+  );
+}
+
+/**
+ * Translate an English phrase. Phrases may contain {placeholders} that are
+ * filled from `vars`, e.g. translate('LUG', 'Hello {name}', { name: 'Grace' }).
+ * Every phrase must exist in lib/translations.ts; run `npm run i18n:check`.
+ */
+export function translate(
+  language: Language,
+  english: string,
+  vars?: TranslationVars,
+): string {
+  if (language === 'EN') return fill(english, vars);
+
+  const entry = TRANSLATIONS[english];
+  if (!entry) {
+    if (process.env.NODE_ENV !== 'production' && !warnedMissing.has(english)) {
+      warnedMissing.add(english);
+      console.warn(`[i18n] Missing translation: "${english}"`);
+    }
+    return fill(english, vars);
+  }
+
+  return fill(entry[language], vars);
+}
+
+export function hasTranslation(english: string): boolean {
+  return english in TRANSLATIONS;
+}
+
+/** Locale used for dates and numbers in each language. */
+export function localeFor(language: Language): string {
+  switch (language) {
+    case 'LUG':
+      return 'lg-UG';
+    case 'SW':
+      return 'sw';
+    case 'AR':
+      // Arabic text, but Western digits so amounts read the same everywhere.
+      return 'ar-u-nu-latn';
+    case 'FR':
+      return 'fr';
+    default:
+      return 'en-GB';
+  }
+}
+
+export function isRightToLeft(language: Language): boolean {
+  return language === 'AR';
+}
+
+/** Keep <html lang/dir> in step with the chosen language. */
+export function applyDocumentLanguage(language: Language): void {
+  if (typeof document === 'undefined') return;
+  const html = document.documentElement;
+  html.lang = localeFor(language).split('-')[0];
+  html.dir = isRightToLeft(language) ? 'rtl' : 'ltr';
 }

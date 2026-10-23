@@ -1,0 +1,1485 @@
+{
+  "Your shop, your story.": {
+    "LUG": "Edduuka lyo, olugero lwo.",
+    "SW": "Duka lako, hadithi yako.",
+    "AR": "متجرك، قصتك.",
+    "FR": "Votre boutique, votre histoire."
+  },
+  "Simple books. Strong business.": {
+    "LUG": "Ebitabo ebyangu. Bizinensi ey'amaanyi.",
+    "SW": "Hesabu rahisi. Biashara imara.",
+    "AR": "دفاتر بسيطة. تجارة قوية.",
+    "FR": "Des comptes simples. Une activité solide."
+  },
+  "Keep your business moving forward.": {
+    "LUG": "Bizinensi yo gyongere mu maaso.",
+    "SW": "Endeleza biashara yako mbele.",
+    "AR": "حافظ على تقدّم عملك.",
+    "FR": "Faites avancer votre activité."
+  },
+  "Record sales, track debts, and understand your shop's story in one friendly place.": {
+    "LUG": "Wandiika by'otunda, goberera amabanja, era otegeere edduuka lyo mu kifo kimu ekyangu.",
+    "SW": "Rekodi mauzo, fuatilia madeni, na uelewe hali ya duka lako mahali pamoja kwa urahisi.",
+    "AR": "سجّل المبيعات وتابع الديون وافهم وضع متجرك في مكان واحد سهل.",
+    "FR": "Enregistrez vos ventes, suivez vos dettes et comprenez votre boutique, au même endroit."
+  },
+  "© 2025 DuukaTalk · Made for local businesses": {
+    "LUG": "© 2025 DuukaTalk · Kyakolebwa ku lwa bizinensi ez'omu kitundu",
+    "SW": "© 2025 DuukaTalk · Imetengenezwa kwa biashara za ndani",
+    "AR": "© 2025 DuukaTalk · صُنع للأعمال المحلية",
+    "FR": "© 2025 DuukaTalk · Conçu pour les commerces locaux"
+  },
+  "Language": {
+    "LUG": "Olulimi",
+    "SW": "Lugha",
+    "AR": "اللغة",
+    "FR": "Langue"
+  },
+  "Welcome to DuukaTalk": {
+    "LUG": "Tukwanirizza ku DuukaTalk",
+    "SW": "Karibu DuukaTalk",
+    "AR": "مرحبًا بك في DuukaTalk",
+    "FR": "Bienvenue sur DuukaTalk"
+  },
+  "Your business, made simpler.": {
+    "LUG": "Bizinensi yo, nga nnyangu.",
+    "SW": "Biashara yako, kwa urahisi zaidi.",
+    "AR": "عملك، بشكل أبسط.",
+    "FR": "Votre activité, en plus simple."
+  },
+  "Keep track of your sales and customer debts without the stress of complicated bookkeeping.": {
+    "LUG": "Goberera by'otunda n'amabanja g'abaguzi awatali kutawaanyizibwa kubala okuzibu.",
+    "SW": "Fuatilia mauzo yako na madeni ya wateja bila usumbufu wa uhasibu mgumu.",
+    "AR": "تابع مبيعاتك وديون عملائك دون عناء المحاسبة المعقدة.",
+    "FR": "Suivez vos ventes et les dettes de vos clients sans le stress d'une comptabilité compliquée."
+  },
+  "Record with your voice": {
+    "LUG": "Wandiika n'eddoboozi lyo",
+    "SW": "Rekodi kwa sauti yako",
+    "AR": "سجّل بصوتك",
+    "FR": "Enregistrez avec votre voix"
+  },
+  "Speak naturally and let DuukaTalk help record your transactions.": {
+    "LUG": "Yogera bulijjo, DuukaTalk ekuyambe okuwandiika by'otunda.",
+    "SW": "Ongea kwa kawaida na DuukaTalk ikusaidie kurekodi miamala yako.",
+    "AR": "تحدّث بشكل طبيعي ودع DuukaTalk يساعدك في تسجيل معاملاتك.",
+    "FR": "Parlez naturellement et laissez DuukaTalk enregistrer vos transactions."
+  },
+  "Keep your ledger organized": {
+    "LUG": "Kuuma ekitabo kyo nga kitegeke",
+    "SW": "Panga daftari lako vizuri",
+    "AR": "نظّم دفتر حساباتك",
+    "FR": "Gardez votre registre en ordre"
+  },
+  "See your sales and customer debts in one simple ledger.": {
+    "LUG": "Laba by'otunda n'amabanja g'abaguzi mu kitabo kimu ekyangu.",
+    "SW": "Ona mauzo yako na madeni ya wateja katika daftari moja rahisi.",
+    "AR": "اطّلع على مبيعاتك وديون عملائك في دفتر واحد بسيط.",
+    "FR": "Voyez vos ventes et les dettes clients dans un registre simple."
+  },
+  "Understand your business": {
+    "LUG": "Tegeera bizinensi yo",
+    "SW": "Elewa biashara yako",
+    "AR": "افهم عملك",
+    "FR": "Comprenez votre activité"
+  },
+  "Get a clear view of sales and outstanding credit.": {
+    "LUG": "Laba bulungi by'otunda n'amabanja agakyaliwo.",
+    "SW": "Pata picha wazi ya mauzo na mikopo ambayo haijalipwa.",
+    "AR": "احصل على صورة واضحة للمبيعات والديون المستحقة.",
+    "FR": "Ayez une vue claire des ventes et des crédits en cours."
+  },
+  "Get Started": {
+    "LUG": "Tandika",
+    "SW": "Anza",
+    "AR": "ابدأ",
+    "FR": "Commencer"
+  },
+  "Create an account or log in to continue.": {
+    "LUG": "Ggulawo akawunti oba yingira okugenda mu maaso.",
+    "SW": "Fungua akaunti au ingia ili kuendelea.",
+    "AR": "أنشئ حسابًا أو سجّل الدخول للمتابعة.",
+    "FR": "Créez un compte ou connectez-vous pour continuer."
+  },
+  "Too many incorrect attempts. Please try again after {time}.": {
+    "LUG": "Ogezezzaako emirundi mingi nga PIN nkyamu. Ddamu oluvannyuma lwa {time}.",
+    "SW": "Majaribio mengi yasiyo sahihi. Tafadhali jaribu tena baada ya {time}.",
+    "AR": "محاولات خاطئة كثيرة. يُرجى المحاولة مرة أخرى بعد {time}.",
+    "FR": "Trop de tentatives incorrectes. Réessayez après {time}."
+  },
+  "Enter your business name to continue.": {
+    "LUG": "Wandiika erinnya lya bizinensi yo okugenda mu maaso.",
+    "SW": "Weka jina la biashara yako ili kuendelea.",
+    "AR": "أدخل اسم نشاطك التجاري للمتابعة.",
+    "FR": "Saisissez le nom de votre commerce pour continuer."
+  },
+  "Your PIN must be exactly 4 digits.": {
+    "LUG": "PIN yo erina okuba ennamba 4 zokka.",
+    "SW": "PIN yako lazima iwe tarakimu 4 hasa.",
+    "AR": "يجب أن يتكون رمز PIN من 4 أرقام بالضبط.",
+    "FR": "Votre PIN doit comporter exactement 4 chiffres."
+  },
+  "Select your country to continue.": {
+    "LUG": "Londa eggwanga lyo okugenda mu maaso.",
+    "SW": "Chagua nchi yako ili kuendelea.",
+    "AR": "اختر بلدك للمتابعة.",
+    "FR": "Choisissez votre pays pour continuer."
+  },
+  "Enter your phone number to continue.": {
+    "LUG": "Wandiika ennamba y'essimu yo okugenda mu maaso.",
+    "SW": "Weka nambari yako ya simu ili kuendelea.",
+    "AR": "أدخل رقم هاتفك للمتابعة.",
+    "FR": "Saisissez votre numéro de téléphone pour continuer."
+  },
+  "Enter a valid phone number.": {
+    "LUG": "Wandiika ennamba y'essimu entuufu.",
+    "SW": "Weka nambari sahihi ya simu.",
+    "AR": "أدخل رقم هاتف صحيحًا.",
+    "FR": "Saisissez un numéro de téléphone valide."
+  },
+  "Your {shop} account is ready to go. You can now log in.": {
+    "LUG": "Akawunti ya {shop} etegekeddwa. Kati osobola okuyingira.",
+    "SW": "Akaunti ya {shop} iko tayari. Sasa unaweza kuingia.",
+    "AR": "حساب {shop} جاهز. يمكنك الآن تسجيل الدخول.",
+    "FR": "Le compte {shop} est prêt. Vous pouvez maintenant vous connecter."
+  },
+  "Incorrect PIN. 1 attempt remaining.": {
+    "LUG": "PIN nkyamu. Osigazza omulundi gumu.",
+    "SW": "PIN si sahihi. Imebaki jaribio 1.",
+    "AR": "رمز PIN غير صحيح. تبقّت محاولة واحدة.",
+    "FR": "PIN incorrect. Il reste 1 tentative."
+  },
+  "Incorrect PIN. {count} attempts remaining.": {
+    "LUG": "PIN nkyamu. Osigazza emirundi {count}.",
+    "SW": "PIN si sahihi. Yamebaki majaribio {count}.",
+    "AR": "رمز PIN غير صحيح. تبقّت {count} محاولات.",
+    "FR": "PIN incorrect. Il reste {count} tentatives."
+  },
+  "Something went wrong. Please check your connection and try again.": {
+    "LUG": "Waliwo ekisobye. Kebera intaneti yo oddemu ogezeeko.",
+    "SW": "Kuna hitilafu. Tafadhali angalia muunganisho wako ujaribu tena.",
+    "AR": "حدث خطأ ما. يُرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+    "FR": "Une erreur s'est produite. Vérifiez votre connexion et réessayez."
+  },
+  "Built for everyday shop owners": {
+    "LUG": "Kyakolebwa ku lwa bannannyini maduuka aba bulijjo",
+    "SW": "Imetengenezwa kwa wamiliki wa maduka wa kila siku",
+    "AR": "مصمّم لأصحاب المتاجر اليومية",
+    "FR": "Conçu pour les commerçants au quotidien"
+  },
+  "Welcome back": {
+    "LUG": "Tukusanyukidde nate",
+    "SW": "Karibu tena",
+    "AR": "مرحبًا بعودتك",
+    "FR": "Bon retour"
+  },
+  "Set up your shop.": {
+    "LUG": "Tegeka edduuka lyo.",
+    "SW": "Sanidi duka lako.",
+    "AR": "أنشئ متجرك.",
+    "FR": "Configurez votre boutique."
+  },
+  "Log in to your shop.": {
+    "LUG": "Yingira mu dduuka lyo.",
+    "SW": "Ingia kwenye duka lako.",
+    "AR": "سجّل الدخول إلى متجرك.",
+    "FR": "Connectez-vous à votre boutique."
+  },
+  "Create a quick, secure account for your business.": {
+    "LUG": "Ggulawo akawunti ey'amangu era enkuumi ku lwa bizinensi yo.",
+    "SW": "Fungua akaunti ya haraka na salama kwa biashara yako.",
+    "AR": "أنشئ حسابًا سريعًا وآمنًا لنشاطك التجاري.",
+    "FR": "Créez un compte rapide et sécurisé pour votre commerce."
+  },
+  "Enter your details to pick up where you left off.": {
+    "LUG": "Wandiika ebikukwatako ogende mu maaso we wakoma.",
+    "SW": "Weka taarifa zako uendelee ulipoachia.",
+    "AR": "أدخل بياناتك لتتابع من حيث توقفت.",
+    "FR": "Saisissez vos informations pour reprendre là où vous en étiez."
+  },
+  "Sign up": {
+    "LUG": "Wewandiise",
+    "SW": "Jisajili",
+    "AR": "إنشاء حساب",
+    "FR": "S'inscrire"
+  },
+  "Log in": {
+    "LUG": "Yingira",
+    "SW": "Ingia",
+    "AR": "تسجيل الدخول",
+    "FR": "Se connecter"
+  },
+  "Business name": {
+    "LUG": "Erinnya lya bizinensi",
+    "SW": "Jina la biashara",
+    "AR": "اسم النشاط التجاري",
+    "FR": "Nom du commerce"
+  },
+  "e.g. Mama Kintu's Shop": {
+    "LUG": "ng'ekyokulabirako: Edduuka lya Maama Kintu",
+    "SW": "mfano: Duka la Mama Kintu",
+    "AR": "مثال: متجر ماما كينتو",
+    "FR": "ex. : Boutique de Mama Kintu"
+  },
+  "Country": {
+    "LUG": "Eggwanga",
+    "SW": "Nchi",
+    "AR": "البلد",
+    "FR": "Pays"
+  },
+  "Currency: {currency}": {
+    "LUG": "Ssente: {currency}",
+    "SW": "Sarafu: {currency}",
+    "AR": "العملة: {currency}",
+    "FR": "Devise : {currency}"
+  },
+  "Phone number": {
+    "LUG": "Ennamba y'essimu",
+    "SW": "Nambari ya simu",
+    "AR": "رقم الهاتف",
+    "FR": "Numéro de téléphone"
+  },
+  "Your number will be saved as {phone}.": {
+    "LUG": "Ennamba yo ejja kuterekebwa nga {phone}.",
+    "SW": "Nambari yako itahifadhiwa kama {phone}.",
+    "AR": "سيُحفظ رقمك بالشكل {phone}.",
+    "FR": "Votre numéro sera enregistré sous la forme {phone}."
+  },
+  "4-digit PIN": {
+    "LUG": "PIN ey'ennamba 4",
+    "SW": "PIN ya tarakimu 4",
+    "AR": "رمز PIN من 4 أرقام",
+    "FR": "PIN à 4 chiffres"
+  },
+  "Keep it private": {
+    "LUG": "Gikuume nga kya kyama",
+    "SW": "Iweke siri",
+    "AR": "احتفظ به سرًّا",
+    "FR": "Gardez-le secret"
+  },
+  "Hide PIN": {
+    "LUG": "Kweka PIN",
+    "SW": "Ficha PIN",
+    "AR": "إخفاء رمز PIN",
+    "FR": "Masquer le PIN"
+  },
+  "Show PIN": {
+    "LUG": "Laga PIN",
+    "SW": "Onyesha PIN",
+    "AR": "إظهار رمز PIN",
+    "FR": "Afficher le PIN"
+  },
+  "Create my account": {
+    "LUG": "Ggulawo akawunti yange",
+    "SW": "Fungua akaunti yangu",
+    "AR": "أنشئ حسابي",
+    "FR": "Créer mon compte"
+  },
+  "By continuing, you agree to keep your account details safe and private.": {
+    "LUG": "Bw'ogenda mu maaso, okkiriza okukuuma ebikwata ku akawunti yo nga bya kyama era nga binywevu.",
+    "SW": "Kwa kuendelea, unakubali kuweka taarifa za akaunti yako salama na siri.",
+    "AR": "بالمتابعة، أنت توافق على الحفاظ على بيانات حسابك آمنة وسرية.",
+    "FR": "En continuant, vous vous engagez à garder vos identifiants sûrs et confidentiels."
+  },
+  "Due {date}": {
+    "LUG": "Lisasulwa {date}",
+    "SW": "Inadaiwa {date}",
+    "AR": "مستحق في {date}",
+    "FR": "Échéance {date}"
+  },
+  "No due date": {
+    "LUG": "Tewali lunaku lwa kusasula",
+    "SW": "Hakuna tarehe ya malipo",
+    "AR": "لا يوجد تاريخ استحقاق",
+    "FR": "Pas d'échéance"
+  },
+  "Just now": {
+    "LUG": "Kaakano",
+    "SW": "Sasa hivi",
+    "AR": "الآن",
+    "FR": "À l'instant"
+  },
+  "Stop giving new credit now. Credit is {share}% of sales, which is too high. First collect debts and save {percent}% of sales, about {amount}. A clear savings record can help banks trust you.": {
+    "LUG": "Lekera awo okuwola abaguzi kati. Amabanja gali {share}% ku by'otunda, ekyo kingi nnyo. Sooka osolooze amabanja era otereke {percent}% ku by'otunda, nga {amount}. Ebiwandiiko by'okutereka ebitegeerekeka biyamba bbanka okukwesiga.",
+    "SW": "Acha kutoa mikopo mipya sasa. Mikopo ni {share}% ya mauzo, ambayo ni mingi mno. Kwanza kusanya madeni na uweke akiba {percent}% ya mauzo, takriban {amount}. Rekodi wazi ya akiba inaweza kusaidia benki kukuamini.",
+    "AR": "توقّف عن منح ائتمان جديد الآن. يمثّل الائتمان {share}% من المبيعات، وهذا مرتفع جدًا. اجمع الديون أولًا وادّخر {percent}% من المبيعات، أي نحو {amount}. سجل الادخار الواضح يساعد البنوك على الثقة بك.",
+    "FR": "Arrêtez d'accorder de nouveaux crédits. Le crédit représente {share} % des ventes, c'est trop élevé. Récupérez d'abord les dettes et épargnez {percent} % des ventes, soit environ {amount}. Un historique d'épargne clair aide les banques à vous faire confiance."
+  },
+  "Cash is okay, but credit is {share}% of sales. Be careful with new credit. Collect repayments, save {percent}% of sales, about {amount}, and keep a simple savings record. This helps banks see you as ready for a loan.": {
+    "LUG": "Ssente ziri bulungi, naye amabanja gali {share}% ku by'otunda. Weegendereze ng'owola abaguzi abapya. Solooza amabanja, tereka {percent}% ku by'otunda, nga {amount}, era okuume ebiwandiiko by'okutereka ebyangu. Kino kiyamba bbanka okukulaba ng'oli mwetegefu okufuna looni.",
+    "SW": "Pesa taslimu iko sawa, lakini mikopo ni {share}% ya mauzo. Kuwa mwangalifu na mikopo mipya. Kusanya malipo, weka akiba {percent}% ya mauzo, takriban {amount}, na uweke rekodi rahisi ya akiba. Hii husaidia benki kukuona uko tayari kwa mkopo.",
+    "AR": "النقد جيد، لكن الائتمان يمثّل {share}% من المبيعات. كن حذرًا مع الائتمان الجديد. اجمع المستحقات وادّخر {percent}% من المبيعات، أي نحو {amount}، واحتفظ بسجل ادخار بسيط. يساعد ذلك البنوك على رؤيتك مستعدًا للحصول على قرض.",
+    "FR": "La trésorerie va bien, mais le crédit représente {share} % des ventes. Soyez prudent avec les nouveaux crédits. Récupérez les remboursements, épargnez {percent} % des ventes, soit environ {amount}, et tenez un relevé d'épargne simple. Cela aide les banques à vous juger prêt pour un prêt."
+  },
+  "Sales are stronger than credit. Keep giving credit carefully, save {percent}% of sales, about {amount}, and keep saving every week. This helps banks trust your sales record and may help you get a loan.": {
+    "LUG": "By'otunda bisinga amabanja. Weeyongere okuwola n'obwegendereza, tereka {percent}% ku by'otunda, nga {amount}, era otereke buli wiiki. Kino kiyamba bbanka okwesiga ebiwandiiko by'otunda era kiyinza okukuyamba okufuna looni.",
+    "SW": "Mauzo ni makubwa kuliko mikopo. Endelea kutoa mikopo kwa uangalifu, weka akiba {percent}% ya mauzo, takriban {amount}, na uendelee kuweka akiba kila wiki. Hii husaidia benki kuamini rekodi yako ya mauzo na inaweza kukusaidia kupata mkopo.",
+    "AR": "المبيعات أقوى من الائتمان. استمر في منح الائتمان بحذر، وادّخر {percent}% من المبيعات، أي نحو {amount}، وواصل الادخار كل أسبوع. يساعد ذلك البنوك على الثقة بسجل مبيعاتك وقد يساعدك في الحصول على قرض.",
+    "FR": "Les ventes dépassent le crédit. Continuez à accorder du crédit avec prudence, épargnez {percent} % des ventes, soit environ {amount}, et épargnez chaque semaine. Cela aide les banques à faire confiance à vos ventes et peut vous aider à obtenir un prêt."
+  },
+  "Syncing offline records...": {
+    "LUG": "Tutereeza ebyawandiikibwa nga tewali intaneti...",
+    "SW": "Inasawazisha rekodi za nje ya mtandao...",
+    "AR": "جارٍ مزامنة السجلات غير المتصلة...",
+    "FR": "Synchronisation des enregistrements hors ligne..."
+  },
+  "Synced offline records to the ledger: {transactions} transactions, {notes} voice notes.": {
+    "LUG": "Ebyawandiikibwa nga tewali intaneti biteekeddwa mu kitabo: ebyatundibwa {transactions}, amaloboozi {notes}.",
+    "SW": "Rekodi za nje ya mtandao zimeongezwa kwenye daftari: miamala {transactions}, sauti {notes}.",
+    "AR": "تمت مزامنة السجلات غير المتصلة مع الدفتر: {transactions} معاملات، و{notes} ملاحظات صوتية.",
+    "FR": "Enregistrements hors ligne synchronisés : {transactions} transactions, {notes} notes vocales."
+  },
+  "No offline records to sync.": {
+    "LUG": "Tewali byawandiikibwa bya kuteeka mu kitabo.",
+    "SW": "Hakuna rekodi za nje ya mtandao za kusawazisha.",
+    "AR": "لا توجد سجلات غير متصلة للمزامنة.",
+    "FR": "Aucun enregistrement hors ligne à synchroniser."
+  },
+  "Offline sync failed. It will retry automatically when the network is back.": {
+    "LUG": "Okuteeka ebyawandiikibwa mu kitabo kulemye. Kujja kuddamu ku lwakyo intaneti bw'eneedda.",
+    "SW": "Usawazishaji umeshindikana. Utajaribu tena wenyewe mtandao ukirudi.",
+    "AR": "فشلت المزامنة. ستُعاد المحاولة تلقائيًا عند عودة الشبكة.",
+    "FR": "La synchronisation a échoué. Elle sera relancée automatiquement au retour du réseau."
+  },
+  "{customer} has an outstanding debt of {amount}.": {
+    "LUG": "{customer} alina ebbanja lya {amount}.",
+    "SW": "{customer} ana deni la {amount}.",
+    "AR": "على {customer} دين مستحق قدره {amount}.",
+    "FR": "{customer} a une dette en cours de {amount}."
+  },
+  "{customer}'s debt is overdue.": {
+    "LUG": "Ebbanja lya {customer} liyise ku lunaku lwalyo.",
+    "SW": "Deni la {customer} limepita muda wake.",
+    "AR": "دين {customer} متأخر عن موعده.",
+    "FR": "La dette de {customer} est en retard."
+  },
+  "Entry saved successfully after warning approval.": {
+    "LUG": "Ekiwandiiko kiterekeddwa bulungi oluvannyuma lw'okukkiriza okulabula.",
+    "SW": "Rekodi imehifadhiwa baada ya kukubali tahadhari.",
+    "AR": "تم حفظ القيد بنجاح بعد الموافقة على التحذير.",
+    "FR": "Entrée enregistrée après acceptation de l'avertissement."
+  },
+  "The warning-approved record could not be saved.": {
+    "LUG": "Ekiwandiiko ekikkirizza okulabula tekisobodde kuterekebwa.",
+    "SW": "Rekodi iliyokubaliwa haikuweza kuhifadhiwa.",
+    "AR": "تعذّر حفظ السجل بعد الموافقة على التحذير.",
+    "FR": "L'entrée approuvée n'a pas pu être enregistrée."
+  },
+  "The voice service did not respond. Please try again.": {
+    "LUG": "Empeereza y'eddoboozi teddamu. Ddamu ogezeeko.",
+    "SW": "Huduma ya sauti haikujibu. Tafadhali jaribu tena.",
+    "AR": "لم تستجب خدمة الصوت. يُرجى المحاولة مرة أخرى.",
+    "FR": "Le service vocal n'a pas répondu. Veuillez réessayer."
+  },
+  "Could not understand the recording. Please try again.": {
+    "LUG": "Tetutegedde ky'owandiise mu ddoboozi. Ddamu ogezeeko.",
+    "SW": "Hatukuelewa rekodi. Tafadhali jaribu tena.",
+    "AR": "تعذّر فهم التسجيل. يُرجى المحاولة مرة أخرى.",
+    "FR": "Enregistrement incompréhensible. Veuillez réessayer."
+  },
+  "Voice record saved after warning approval.": {
+    "LUG": "Eddoboozi literekeddwa oluvannyuma lw'okukkiriza okulabula.",
+    "SW": "Rekodi ya sauti imehifadhiwa baada ya kukubali tahadhari.",
+    "AR": "تم حفظ التسجيل الصوتي بعد الموافقة على التحذير.",
+    "FR": "Enregistrement vocal sauvegardé après acceptation de l'avertissement."
+  },
+  "The voice record could not be saved after the warning approval.": {
+    "LUG": "Eddoboozi teryasobodde kuterekebwa oluvannyuma lw'okukkiriza okulabula.",
+    "SW": "Rekodi ya sauti haikuweza kuhifadhiwa baada ya kukubali tahadhari.",
+    "AR": "تعذّر حفظ التسجيل الصوتي بعد الموافقة على التحذير.",
+    "FR": "L'enregistrement vocal n'a pas pu être sauvegardé après l'avertissement."
+  },
+  "PIN must be exactly 4 digits.": {
+    "LUG": "PIN erina okuba ennamba 4 zokka.",
+    "SW": "PIN lazima iwe tarakimu 4 hasa.",
+    "AR": "يجب أن يتكون رمز PIN من 4 أرقام بالضبط.",
+    "FR": "Le PIN doit comporter exactement 4 chiffres."
+  },
+  "Could not save privacy settings.": {
+    "LUG": "Enteekateeka z'obukuumi tezisobodde kuterekebwa.",
+    "SW": "Imeshindikana kuhifadhi mipangilio ya faragha.",
+    "AR": "تعذّر حفظ إعدادات الخصوصية.",
+    "FR": "Impossible d'enregistrer les paramètres de confidentialité."
+  },
+  "Privacy settings saved.": {
+    "LUG": "Enteekateeka z'obukuumi ziterekeddwa.",
+    "SW": "Mipangilio ya faragha imehifadhiwa.",
+    "AR": "تم حفظ إعدادات الخصوصية.",
+    "FR": "Paramètres de confidentialité enregistrés."
+  },
+  "Please enter a customer, item, and valid amount.": {
+    "LUG": "Wandiika omuguzi, ekintu, n'omuwendo omutuufu.",
+    "SW": "Tafadhali weka mteja, bidhaa, na kiasi sahihi.",
+    "AR": "يُرجى إدخال العميل والصنف ومبلغ صحيح.",
+    "FR": "Veuillez saisir un client, un article et un montant valide."
+  },
+  "Failed to update transaction.": {
+    "LUG": "Ekiwandiiko tekisobodde kukyusibwa.",
+    "SW": "Imeshindikana kusasisha muamala.",
+    "AR": "تعذّر تحديث المعاملة.",
+    "FR": "Échec de la mise à jour de la transaction."
+  },
+  "Transaction updated successfully.": {
+    "LUG": "Ekiwandiiko kikyusiddwa bulungi.",
+    "SW": "Muamala umesasishwa.",
+    "AR": "تم تحديث المعاملة بنجاح.",
+    "FR": "Transaction mise à jour."
+  },
+  "Failed to delete transaction.": {
+    "LUG": "Ekiwandiiko tekisobodde kusazibwamu.",
+    "SW": "Imeshindikana kufuta muamala.",
+    "AR": "تعذّر حذف المعاملة.",
+    "FR": "Échec de la suppression de la transaction."
+  },
+  "Transaction deleted successfully.": {
+    "LUG": "Ekiwandiiko kisaziddwamu bulungi.",
+    "SW": "Muamala umefutwa.",
+    "AR": "تم حذف المعاملة بنجاح.",
+    "FR": "Transaction supprimée."
+  },
+  "Add a customer, item, and amount first.": {
+    "LUG": "Sooka owandiike omuguzi, ekintu, n'omuwendo.",
+    "SW": "Kwanza weka mteja, bidhaa, na kiasi.",
+    "AR": "أضف العميل والصنف والمبلغ أولًا.",
+    "FR": "Ajoutez d'abord un client, un article et un montant."
+  },
+  "You are offline. The entry was saved to the offline queue.": {
+    "LUG": "Tolina intaneti. Ekiwandiiko kiterekeddwa okulinda intaneti.",
+    "SW": "Uko nje ya mtandao. Rekodi imehifadhiwa kwenye foleni.",
+    "AR": "أنت غير متصل. حُفظ القيد في قائمة الانتظار.",
+    "FR": "Vous êtes hors ligne. L'entrée a été placée en file d'attente."
+  },
+  "Entry saved successfully.": {
+    "LUG": "Ekiwandiiko kiterekeddwa bulungi.",
+    "SW": "Rekodi imehifadhiwa.",
+    "AR": "تم حفظ القيد بنجاح.",
+    "FR": "Entrée enregistrée."
+  },
+  "Entry could not be saved: {reason}": {
+    "LUG": "Ekiwandiiko tekisobodde kuterekebwa: {reason}",
+    "SW": "Rekodi haikuweza kuhifadhiwa: {reason}",
+    "AR": "تعذّر حفظ القيد: {reason}",
+    "FR": "L'entrée n'a pas pu être enregistrée : {reason}"
+  },
+  "Customer": {
+    "LUG": "Omuguzi",
+    "SW": "Mteja",
+    "AR": "العميل",
+    "FR": "Client"
+  },
+  "Item": {
+    "LUG": "Ekintu",
+    "SW": "Bidhaa",
+    "AR": "الصنف",
+    "FR": "Article"
+  },
+  "Amount ({currency})": {
+    "LUG": "Omuwendo ({currency})",
+    "SW": "Kiasi ({currency})",
+    "AR": "المبلغ ({currency})",
+    "FR": "Montant ({currency})"
+  },
+  "Type": {
+    "LUG": "Ekika",
+    "SW": "Aina",
+    "AR": "النوع",
+    "FR": "Type"
+  },
+  "Date": {
+    "LUG": "Olunaku",
+    "SW": "Tarehe",
+    "AR": "التاريخ",
+    "FR": "Date"
+  },
+  "Cash": {
+    "LUG": "Ssente nkalu",
+    "SW": "Taslimu",
+    "AR": "نقدًا",
+    "FR": "Comptant"
+  },
+  "Credit": {
+    "LUG": "Ebbanja",
+    "SW": "Mkopo",
+    "AR": "آجل",
+    "FR": "Crédit"
+  },
+  "Received an unexpected response. Please try again.": {
+    "LUG": "Tufunye eky'okuddamu ekitategeerekeka. Ddamu ogezeeko.",
+    "SW": "Tumepokea jibu lisilotarajiwa. Tafadhali jaribu tena.",
+    "AR": "تم استلام رد غير متوقع. يُرجى المحاولة مرة أخرى.",
+    "FR": "Réponse inattendue. Veuillez réessayer."
+  },
+  "The transaction was processed, but its database ID was missing. Please refresh and try again.": {
+    "LUG": "Ekiwandiiko kikoleddwako, naye ennamba yaakyo ebula. Ddamu otikke olupapula ogezeeko.",
+    "SW": "Muamala umeshughulikiwa, lakini kitambulisho chake hakipo. Tafadhali onyesha upya ujaribu tena.",
+    "AR": "تمت معالجة المعاملة، لكن معرّفها مفقود. يُرجى تحديث الصفحة والمحاولة مرة أخرى.",
+    "FR": "La transaction a été traitée mais son identifiant manque. Actualisez et réessayez."
+  },
+  "Recorded item": {
+    "LUG": "Ekintu ekiwandiikiddwa",
+    "SW": "Bidhaa iliyorekodiwa",
+    "AR": "صنف مسجّل",
+    "FR": "Article enregistré"
+  },
+  "Entry saved from your voice recording.": {
+    "LUG": "Ekiwandiiko kiterekeddwa okuva mu ddoboozi lyo.",
+    "SW": "Rekodi imehifadhiwa kutoka kwa sauti yako.",
+    "AR": "تم حفظ القيد من تسجيلك الصوتي.",
+    "FR": "Entrée enregistrée à partir de votre message vocal."
+  },
+  "You are offline. The recording is queued to sync when internet returns.": {
+    "LUG": "Tolina intaneti. Eddoboozi lijja kuterekebwa intaneti bw'eneedda.",
+    "SW": "Uko nje ya mtandao. Rekodi itasawazishwa mtandao ukirudi.",
+    "AR": "أنت غير متصل. سيُزامن التسجيل عند عودة الإنترنت.",
+    "FR": "Vous êtes hors ligne. L'enregistrement sera synchronisé au retour d'Internet."
+  },
+  "Something went wrong uploading your recording. Please check your connection and try again.": {
+    "LUG": "Waliwo ekisobye mu kusindika eddoboozi lyo. Kebera intaneti yo oddemu ogezeeko.",
+    "SW": "Hitilafu imetokea wakati wa kupakia rekodi yako. Tafadhali angalia muunganisho ujaribu tena.",
+    "AR": "حدث خطأ أثناء رفع تسجيلك. يُرجى التحقق من اتصالك والمحاولة مرة أخرى.",
+    "FR": "Échec de l'envoi de votre enregistrement. Vérifiez votre connexion et réessayez."
+  },
+  "Microphone access is not supported in this browser.": {
+    "LUG": "Browser eno tesobola kukozesa mikolofoni.",
+    "SW": "Kivinjari hiki hakitumii kipaza sauti.",
+    "AR": "هذا المتصفح لا يدعم الوصول إلى الميكروفون.",
+    "FR": "Ce navigateur ne permet pas l'accès au micro."
+  },
+  "Voice recording is not supported in this browser.": {
+    "LUG": "Browser eno tesobola kukwata ddoboozi.",
+    "SW": "Kivinjari hiki hakitumii kurekodi sauti.",
+    "AR": "هذا المتصفح لا يدعم التسجيل الصوتي.",
+    "FR": "Ce navigateur ne permet pas l'enregistrement vocal."
+  },
+  "Recording failed. Please try again.": {
+    "LUG": "Okukwata eddoboozi kulemye. Ddamu ogezeeko.",
+    "SW": "Kurekodi kumeshindikana. Tafadhali jaribu tena.",
+    "AR": "فشل التسجيل. يُرجى المحاولة مرة أخرى.",
+    "FR": "L'enregistrement a échoué. Veuillez réessayer."
+  },
+  "Microphone access was denied or unavailable.": {
+    "LUG": "Mikolofoni egaaniddwa oba teriiwo.",
+    "SW": "Ruhusa ya kipaza sauti imekataliwa au haipatikani.",
+    "AR": "تم رفض الوصول إلى الميكروفون أو أنه غير متاح.",
+    "FR": "Accès au micro refusé ou indisponible."
+  },
+  "Processing...": {
+    "LUG": "Kikolebwako...",
+    "SW": "Inashughulikiwa...",
+    "AR": "جارٍ المعالجة...",
+    "FR": "Traitement..."
+  },
+  "Listening...": {
+    "LUG": "Mpuliriza...",
+    "SW": "Inasikiliza...",
+    "AR": "جارٍ الاستماع...",
+    "FR": "Écoute..."
+  },
+  "Tap to Speak": {
+    "LUG": "Nyiga oyogere",
+    "SW": "Gusa uongee",
+    "AR": "اضغط للتحدث",
+    "FR": "Touchez pour parler"
+  },
+  "Processing recording": {
+    "LUG": "Eddoboozi likolebwako",
+    "SW": "Inashughulikia rekodi",
+    "AR": "جارٍ معالجة التسجيل",
+    "FR": "Traitement de l'enregistrement"
+  },
+  "Stop recording": {
+    "LUG": "Komya okukwata eddoboozi",
+    "SW": "Acha kurekodi",
+    "AR": "إيقاف التسجيل",
+    "FR": "Arrêter l'enregistrement"
+  },
+  "Start recording": {
+    "LUG": "Tandika okukwata eddoboozi",
+    "SW": "Anza kurekodi",
+    "AR": "بدء التسجيل",
+    "FR": "Démarrer l'enregistrement"
+  },
+  "Processing your recording…": {
+    "LUG": "Eddoboozi lyo likolebwako…",
+    "SW": "Inashughulikia rekodi yako…",
+    "AR": "جارٍ معالجة تسجيلك…",
+    "FR": "Traitement de votre enregistrement…"
+  },
+  "Heard": {
+    "LUG": "Kye mpulidde",
+    "SW": "Nimesikia",
+    "AR": "سمعت",
+    "FR": "Entendu"
+  },
+  "Could not access the microphone.": {
+    "LUG": "Tetusobodde kukozesa mikolofoni.",
+    "SW": "Imeshindikana kufikia kipaza sauti.",
+    "AR": "تعذّر الوصول إلى الميكروفون.",
+    "FR": "Impossible d'accéder au micro."
+  },
+  "I could not play the spoken response.": {
+    "LUG": "Sisobodde kuwuliriza ky'okuddamu.",
+    "SW": "Sikuweza kucheza jibu la sauti.",
+    "AR": "لم أتمكن من تشغيل الرد الصوتي.",
+    "FR": "Je n'ai pas pu lire la réponse vocale."
+  },
+  "The answer is ready, but I could not play the audio.": {
+    "LUG": "Eky'okuddamu kiwedde, naye sisobodde kukiwuliza.",
+    "SW": "Jibu liko tayari, lakini sikuweza kucheza sauti.",
+    "AR": "الإجابة جاهزة، لكن تعذّر تشغيل الصوت.",
+    "FR": "La réponse est prête, mais l'audio n'a pas pu être lu."
+  },
+  "Could not process your question.": {
+    "LUG": "Tetusobodde kukola ku kibuuzo kyo.",
+    "SW": "Imeshindikana kushughulikia swali lako.",
+    "AR": "تعذّرت معالجة سؤالك.",
+    "FR": "Impossible de traiter votre question."
+  },
+  "Your Business": {
+    "LUG": "Bizinensi yo",
+    "SW": "Biashara yako",
+    "AR": "نشاطك التجاري",
+    "FR": "Votre commerce"
+  },
+  "DuukaTalk Vendor": {
+    "LUG": "Omusuubuzi wa DuukaTalk",
+    "SW": "Muuzaji wa DuukaTalk",
+    "AR": "بائع DuukaTalk",
+    "FR": "Vendeur DuukaTalk"
+  },
+  "Connected": {
+    "LUG": "Kiyungiddwa",
+    "SW": "Imeunganishwa",
+    "AR": "متصل",
+    "FR": "Connecté"
+  },
+  "Record a sale or debt in English or Luganda": {
+    "LUG": "Wandiika ekyatundiddwa oba ebbanja mu Lungereza oba Luganda",
+    "SW": "Rekodi mauzo au deni kwa Kiingereza au Luganda",
+    "AR": "سجّل بيعًا أو دينًا بالإنجليزية أو اللوغندية",
+    "FR": "Enregistrez une vente ou une dette en anglais ou en luganda"
+  },
+  "Could not load your live database data. Please refresh and try again.": {
+    "LUG": "Tetusobodde kuleeta data yo. Ddamu otikke olupapula ogezeeko.",
+    "SW": "Imeshindikana kupakia data yako. Tafadhali onyesha upya ujaribu tena.",
+    "AR": "تعذّر تحميل بياناتك. يُرجى تحديث الصفحة والمحاولة مرة أخرى.",
+    "FR": "Impossible de charger vos données. Actualisez et réessayez."
+  },
+  "OR WRITE": {
+    "LUG": "OBA WANDIIKA",
+    "SW": "AU ANDIKA",
+    "AR": "أو اكتب",
+    "FR": "OU ÉCRIVEZ"
+  },
+  "Type manually": {
+    "LUG": "Wandiika n'engalo",
+    "SW": "Andika mwenyewe",
+    "AR": "أدخل يدويًا",
+    "FR": "Saisir manuellement"
+  },
+  "Customer (Name or Phone)": {
+    "LUG": "Omuguzi (Erinnya oba Essimu)",
+    "SW": "Mteja (Jina au Simu)",
+    "AR": "العميل (الاسم أو الهاتف)",
+    "FR": "Client (nom ou téléphone)"
+  },
+  "e.g. Nakato Grace or 0772…": {
+    "LUG": "ng'ekyokulabirako: Nakato Grace oba 0772…",
+    "SW": "mfano: Nakato Grace au 0772…",
+    "AR": "مثال: Nakato Grace أو 0772…",
+    "FR": "ex. : Nakato Grace ou 0772…"
+  },
+  "Item & Quantity": {
+    "LUG": "Ekintu n'Obungi",
+    "SW": "Bidhaa na Kiasi",
+    "AR": "الصنف والكمية",
+    "FR": "Article et quantité"
+  },
+  "e.g. Kasooli 2kg, Amafuta 1L": {
+    "LUG": "ng'ekyokulabirako: Kasooli 2kg, Amafuta 1L",
+    "SW": "mfano: Mahindi 2kg, Mafuta 1L",
+    "AR": "مثال: ذرة 2 كغ، زيت 1 لتر",
+    "FR": "ex. : Maïs 2 kg, Huile 1 L"
+  },
+  "Total Amount ({currency})": {
+    "LUG": "Omuwendo Gwonna ({currency})",
+    "SW": "Jumla ya Kiasi ({currency})",
+    "AR": "المبلغ الإجمالي ({currency})",
+    "FR": "Montant total ({currency})"
+  },
+  "Save Entry": {
+    "LUG": "Tereka",
+    "SW": "Hifadhi",
+    "AR": "حفظ القيد",
+    "FR": "Enregistrer"
+  },
+  "Daily": {
+    "LUG": "Buli lunaku",
+    "SW": "Kila siku",
+    "AR": "يومي",
+    "FR": "Quotidien"
+  },
+  "Weekly": {
+    "LUG": "Buli wiiki",
+    "SW": "Kila wiki",
+    "AR": "أسبوعي",
+    "FR": "Hebdomadaire"
+  },
+  "Monthly": {
+    "LUG": "Buli mwezi",
+    "SW": "Kila mwezi",
+    "AR": "شهري",
+    "FR": "Mensuel"
+  },
+  "Total inflows": {
+    "LUG": "Ssente zonna eziyingidde",
+    "SW": "Jumla ya mapato",
+    "AR": "إجمالي الإيرادات",
+    "FR": "Total des entrées"
+  },
+  "Loading...": {
+    "LUG": "Kitikka...",
+    "SW": "Inapakia...",
+    "AR": "جارٍ التحميل...",
+    "FR": "Chargement..."
+  },
+  "Live": {
+    "LUG": "Kaakano",
+    "SW": "Moja kwa moja",
+    "AR": "مباشر",
+    "FR": "En direct"
+  },
+  "Cash in Hand": {
+    "LUG": "Ssente eziri mu ngalo",
+    "SW": "Pesa Mkononi",
+    "AR": "النقد المتوفر",
+    "FR": "Espèces en caisse"
+  },
+  "Credit Given": {
+    "LUG": "Amabanja agawoleddwa",
+    "SW": "Mikopo Iliyotolewa",
+    "AR": "الائتمان الممنوح",
+    "FR": "Crédit accordé"
+  },
+  "Search customer or item…": {
+    "LUG": "Noonya omuguzi oba ekintu…",
+    "SW": "Tafuta mteja au bidhaa…",
+    "AR": "ابحث عن عميل أو صنف…",
+    "FR": "Rechercher un client ou un article…"
+  },
+  "Ask DuukaTalk a question": {
+    "LUG": "Buuza DuukaTalk ekibuuzo",
+    "SW": "Uliza DuukaTalk swali",
+    "AR": "اطرح سؤالًا على DuukaTalk",
+    "FR": "Posez une question à DuukaTalk"
+  },
+  "Listening…": {
+    "LUG": "Mpuliriza…",
+    "SW": "Inasikiliza…",
+    "AR": "جارٍ الاستماع…",
+    "FR": "Écoute…"
+  },
+  "Thinking…": {
+    "LUG": "Ndowooza…",
+    "SW": "Inafikiri…",
+    "AR": "جارٍ التفكير…",
+    "FR": "Réflexion…"
+  },
+  "Speaking…": {
+    "LUG": "Njogera…",
+    "SW": "Inazungumza…",
+    "AR": "جارٍ التحدث…",
+    "FR": "Lecture…"
+  },
+  "Voice Assistant": {
+    "LUG": "Omuyambi w'eddoboozi",
+    "SW": "Msaidizi wa Sauti",
+    "AR": "المساعد الصوتي",
+    "FR": "Assistant vocal"
+  },
+  "You:": {
+    "LUG": "Ggwe:",
+    "SW": "Wewe:",
+    "AR": "أنت:",
+    "FR": "Vous :"
+  },
+  "DuukaTalk:": {
+    "LUG": "DuukaTalk:",
+    "SW": "DuukaTalk:",
+    "AR": "DuukaTalk:",
+    "FR": "DuukaTalk :"
+  },
+  "Transactions": {
+    "LUG": "Ebyatundibwa",
+    "SW": "Miamala",
+    "AR": "المعاملات",
+    "FR": "Transactions"
+  },
+  "From your database": {
+    "LUG": "Okuva mu biwandiiko byo",
+    "SW": "Kutoka kwenye data yako",
+    "AR": "من بياناتك",
+    "FR": "Depuis vos données"
+  },
+  "Loading your transactions...": {
+    "LUG": "Tuleeta ebyatundibwa byo...",
+    "SW": "Inapakia miamala yako...",
+    "AR": "جارٍ تحميل معاملاتك...",
+    "FR": "Chargement de vos transactions..."
+  },
+  "Edit transaction for {customer}": {
+    "LUG": "Kyusa ekiwandiiko kya {customer}",
+    "SW": "Hariri muamala wa {customer}",
+    "AR": "تعديل معاملة {customer}",
+    "FR": "Modifier la transaction de {customer}"
+  },
+  "Edit transaction": {
+    "LUG": "Kyusa ekiwandiiko",
+    "SW": "Hariri muamala",
+    "AR": "تعديل المعاملة",
+    "FR": "Modifier la transaction"
+  },
+  "Delete transaction for {customer}": {
+    "LUG": "Sazaamu ekiwandiiko kya {customer}",
+    "SW": "Futa muamala wa {customer}",
+    "AR": "حذف معاملة {customer}",
+    "FR": "Supprimer la transaction de {customer}"
+  },
+  "Delete transaction": {
+    "LUG": "Sazaamu ekiwandiiko",
+    "SW": "Futa muamala",
+    "AR": "حذف المعاملة",
+    "FR": "Supprimer la transaction"
+  },
+  "Edit Transaction": {
+    "LUG": "Kyusa Ekiwandiiko",
+    "SW": "Hariri Muamala",
+    "AR": "تعديل المعاملة",
+    "FR": "Modifier la transaction"
+  },
+  "Update the transaction details below.": {
+    "LUG": "Kyusa ebikwata ku kiwandiiko wansi.",
+    "SW": "Sasisha taarifa za muamala hapa chini.",
+    "AR": "حدّث تفاصيل المعاملة أدناه.",
+    "FR": "Modifiez les détails de la transaction ci-dessous."
+  },
+  "Close edit form": {
+    "LUG": "Ggalawo foomu y'okukyusa",
+    "SW": "Funga fomu ya kuhariri",
+    "AR": "إغلاق نموذج التعديل",
+    "FR": "Fermer le formulaire de modification"
+  },
+  "Payment Type": {
+    "LUG": "Engeri y'okusasula",
+    "SW": "Aina ya Malipo",
+    "AR": "طريقة الدفع",
+    "FR": "Mode de paiement"
+  },
+  "Due Date": {
+    "LUG": "Olunaku lw'okusasula",
+    "SW": "Tarehe ya Malipo",
+    "AR": "تاريخ الاستحقاق",
+    "FR": "Date d'échéance"
+  },
+  "Cancel": {
+    "LUG": "Sazaamu",
+    "SW": "Ghairi",
+    "AR": "إلغاء",
+    "FR": "Annuler"
+  },
+  "Saving...": {
+    "LUG": "Ntereka...",
+    "SW": "Inahifadhi...",
+    "AR": "جارٍ الحفظ...",
+    "FR": "Enregistrement..."
+  },
+  "Save Changes": {
+    "LUG": "Tereka Enkyukakyuka",
+    "SW": "Hifadhi Mabadiliko",
+    "AR": "حفظ التغييرات",
+    "FR": "Enregistrer les modifications"
+  },
+  "Delete Transaction?": {
+    "LUG": "Sazaamu Ekiwandiiko?",
+    "SW": "Futa Muamala?",
+    "AR": "حذف المعاملة؟",
+    "FR": "Supprimer la transaction ?"
+  },
+  "This action cannot be undone.": {
+    "LUG": "Kino tekisobola kuddizibwa.",
+    "SW": "Kitendo hiki hakiwezi kutenduliwa.",
+    "AR": "لا يمكن التراجع عن هذا الإجراء.",
+    "FR": "Cette action est irréversible."
+  },
+  "Close delete confirmation": {
+    "LUG": "Ggalawo okukakasa okusazaamu",
+    "SW": "Funga uthibitisho wa kufuta",
+    "AR": "إغلاق تأكيد الحذف",
+    "FR": "Fermer la confirmation de suppression"
+  },
+  "Deleting...": {
+    "LUG": "Nsazaamu...",
+    "SW": "Inafuta...",
+    "AR": "جارٍ الحذف...",
+    "FR": "Suppression..."
+  },
+  "Delete": {
+    "LUG": "Sazaamu",
+    "SW": "Futa",
+    "AR": "حذف",
+    "FR": "Supprimer"
+  },
+  "Outstanding debts": {
+    "LUG": "Amabanja agakyaliwo",
+    "SW": "Madeni yasiyolipwa",
+    "AR": "الديون المستحقة",
+    "FR": "Dettes en cours"
+  },
+  "1 customer has outstanding credit.": {
+    "LUG": "Omuguzi omu alina ebbanja.",
+    "SW": "Mteja 1 ana deni ambalo halijalipwa.",
+    "AR": "لدى عميل واحد دين مستحق.",
+    "FR": "1 client a un crédit en cours."
+  },
+  "{count} customers have outstanding credit.": {
+    "LUG": "Abaguzi {count} balina amabanja.",
+    "SW": "Wateja {count} wana madeni ambayo hayajalipwa.",
+    "AR": "لدى {count} عملاء ديون مستحقة.",
+    "FR": "{count} clients ont un crédit en cours."
+  },
+  "Active Debts": {
+    "LUG": "Amabanja agakyaliwo",
+    "SW": "Madeni Yaliyopo",
+    "AR": "الديون القائمة",
+    "FR": "Dettes actives"
+  },
+  "Add Debt": {
+    "LUG": "Yongeramu ebbanja",
+    "SW": "Ongeza Deni",
+    "AR": "إضافة دين",
+    "FR": "Ajouter une dette"
+  },
+  "Exceeded loan limit": {
+    "LUG": "Ebbanja lisusse ekkomo",
+    "SW": "Kikomo cha mkopo kimepitwa",
+    "AR": "تم تجاوز حد الائتمان",
+    "FR": "Limite de crédit dépassée"
+  },
+  "{customer} has exceeded {limit} by {excess}.": {
+    "LUG": "{customer} asusse ekkomo lya {limit} ne {excess}.",
+    "SW": "{customer} amepita kikomo cha {limit} kwa {excess}.",
+    "AR": "تجاوز {customer} الحد البالغ {limit} بمقدار {excess}.",
+    "FR": "{customer} a dépassé la limite de {limit} de {excess}."
+  },
+  "Loading debts...": {
+    "LUG": "Tuleeta amabanja...",
+    "SW": "Inapakia madeni...",
+    "AR": "جارٍ تحميل الديون...",
+    "FR": "Chargement des dettes..."
+  },
+  "No outstanding debts found.": {
+    "LUG": "Tewali mabanja gakyaliwo.",
+    "SW": "Hakuna madeni yasiyolipwa.",
+    "AR": "لا توجد ديون مستحقة.",
+    "FR": "Aucune dette en cours."
+  },
+  "Business Insights": {
+    "LUG": "Ebikwata ku Bizinensi",
+    "SW": "Maarifa ya Biashara",
+    "AR": "رؤى النشاط التجاري",
+    "FR": "Aperçu de l'activité"
+  },
+  "Live Data": {
+    "LUG": "Data ya kaakano",
+    "SW": "Data ya Moja kwa Moja",
+    "AR": "بيانات مباشرة",
+    "FR": "Données en direct"
+  },
+  "Cash sales": {
+    "LUG": "Ebyatundibwa ku ssente nkalu",
+    "SW": "Mauzo ya taslimu",
+    "AR": "المبيعات النقدية",
+    "FR": "Ventes au comptant"
+  },
+  "Debt sales": {
+    "LUG": "Ebyatundibwa ku bbanja",
+    "SW": "Mauzo ya mkopo",
+    "AR": "المبيعات الآجلة",
+    "FR": "Ventes à crédit"
+  },
+  "Savings & Loan Readiness Coach": {
+    "LUG": "Omuwabuzi w'Okutereka n'Okwetegekera Looni",
+    "SW": "Mshauri wa Akiba na Utayari wa Mkopo",
+    "AR": "مرشد الادخار والجاهزية للقروض",
+    "FR": "Coach épargne et préparation au prêt"
+  },
+  "Loan readiness score": {
+    "LUG": "Obubonero bw'okwetegekera looni",
+    "SW": "Alama ya utayari wa mkopo",
+    "AR": "درجة الجاهزية للقرض",
+    "FR": "Score de préparation au prêt"
+  },
+  "Recommended savings target": {
+    "LUG": "Ssente eziteeseddwa okutereka",
+    "SW": "Lengo la akiba linalopendekezwa",
+    "AR": "هدف الادخار المقترح",
+    "FR": "Objectif d'épargne recommandé"
+  },
+  "Cash vs credit in shop": {
+    "LUG": "Ssente nkalu n'amabanja mu dduuka",
+    "SW": "Taslimu dhidi ya mkopo dukani",
+    "AR": "النقد مقابل الائتمان في المتجر",
+    "FR": "Comptant vs crédit en boutique"
+  },
+  "Coach advice": {
+    "LUG": "Amagezi g'omuwabuzi",
+    "SW": "Ushauri wa mshauri",
+    "AR": "نصيحة المرشد",
+    "FR": "Conseil du coach"
+  },
+  "Keep cash at hand above credit and save a percentage of sales each week. If your shop accounts are operating well, banks can give you a loan.": {
+    "LUG": "Kuuma ssente eziri mu ngalo nga zisinga amabanja era otereke ekitundu ku by'otunda buli wiiki. Ebitabo by'edduuka lyo bwe biba nga bitambula bulungi, bbanka zisobola okukuwa looni.",
+    "SW": "Weka pesa mkononi kuliko mikopo na uweke akiba sehemu ya mauzo kila wiki. Hesabu za duka lako zikiwa nzuri, benki zinaweza kukupa mkopo.",
+    "AR": "حافظ على النقد المتوفر أعلى من الائتمان وادّخر نسبة من المبيعات كل أسبوع. إذا كانت حسابات متجرك جيدة، يمكن للبنوك منحك قرضًا.",
+    "FR": "Gardez plus d'espèces que de crédit et épargnez une part des ventes chaque semaine. Si vos comptes sont sains, les banques peuvent vous accorder un prêt."
+  },
+  "Database Activity": {
+    "LUG": "Ebikoleddwa mu biwandiiko",
+    "SW": "Shughuli za Data",
+    "AR": "نشاط البيانات",
+    "FR": "Activité des données"
+  },
+  "Transactions recorded": {
+    "LUG": "Ebiwandiikiddwa",
+    "SW": "Miamala iliyorekodiwa",
+    "AR": "المعاملات المسجّلة",
+    "FR": "Transactions enregistrées"
+  },
+  "Cash transactions": {
+    "LUG": "Ebyatundibwa ku ssente nkalu",
+    "SW": "Miamala ya taslimu",
+    "AR": "المعاملات النقدية",
+    "FR": "Transactions au comptant"
+  },
+  "Credit transactions": {
+    "LUG": "Ebyatundibwa ku bbanja",
+    "SW": "Miamala ya mkopo",
+    "AR": "المعاملات الآجلة",
+    "FR": "Transactions à crédit"
+  },
+  "Notifications": {
+    "LUG": "Obubaka",
+    "SW": "Arifa",
+    "AR": "الإشعارات",
+    "FR": "Notifications"
+  },
+  "Close notifications": {
+    "LUG": "Ggalawo obubaka",
+    "SW": "Funga arifa",
+    "AR": "إغلاق الإشعارات",
+    "FR": "Fermer les notifications"
+  },
+  "No new notifications": {
+    "LUG": "Tewali bubaka bupya",
+    "SW": "Hakuna arifa mpya",
+    "AR": "لا توجد إشعارات جديدة",
+    "FR": "Aucune nouvelle notification"
+  },
+  "Settings": {
+    "LUG": "Enteekateeka",
+    "SW": "Mipangilio",
+    "AR": "الإعدادات",
+    "FR": "Paramètres"
+  },
+  "Toggle theme": {
+    "LUG": "Kyusa langi",
+    "SW": "Badilisha mandhari",
+    "AR": "تبديل المظهر",
+    "FR": "Changer de thème"
+  },
+  "Privacy": {
+    "LUG": "Obukuumi",
+    "SW": "Faragha",
+    "AR": "الخصوصية",
+    "FR": "Confidentialité"
+  },
+  "Change PIN or phone number": {
+    "LUG": "Kyusa PIN oba ennamba y'essimu",
+    "SW": "Badilisha PIN au nambari ya simu",
+    "AR": "تغيير رمز PIN أو رقم الهاتف",
+    "FR": "Modifier le PIN ou le numéro de téléphone"
+  },
+  "New 4-digit PIN": {
+    "LUG": "PIN empya ey'ennamba 4",
+    "SW": "PIN mpya ya tarakimu 4",
+    "AR": "رمز PIN جديد من 4 أرقام",
+    "FR": "Nouveau PIN à 4 chiffres"
+  },
+  "Save changes": {
+    "LUG": "Tereka enkyukakyuka",
+    "SW": "Hifadhi mabadiliko",
+    "AR": "حفظ التغييرات",
+    "FR": "Enregistrer les modifications"
+  },
+  "Log out": {
+    "LUG": "Fuluma",
+    "SW": "Toka",
+    "AR": "تسجيل الخروج",
+    "FR": "Se déconnecter"
+  },
+
+  "Record": {
+    "LUG": "Wandiika",
+    "SW": "Rekodi",
+    "AR": "تسجيل",
+    "FR": "Enregistrer"
+  },
+  "Ledgers": {
+    "LUG": "Ebitabo",
+    "SW": "Madaftari",
+    "AR": "الدفاتر",
+    "FR": "Registres"
+  },
+  "Debts & Dues": {
+    "LUG": "Amabanja",
+    "SW": "Madeni na Malipo",
+    "AR": "الديون والمستحقات",
+    "FR": "Dettes et échéances"
+  },
+  "Reports": {
+    "LUG": "Lipoota",
+    "SW": "Ripoti",
+    "AR": "التقارير",
+    "FR": "Rapports"
+  },
+  "Unknown customer": {
+    "LUG": "Omuguzi atamanyiddwa",
+    "SW": "Mteja asiyejulikana",
+    "AR": "عميل غير معروف",
+    "FR": "Client inconnu"
+  },
+  "Recorded transaction": {
+    "LUG": "Ekiwandiikiddwa",
+    "SW": "Muamala uliorekodiwa",
+    "AR": "معاملة مسجّلة",
+    "FR": "Transaction enregistrée"
+  },
+  "Credit balance": {
+    "LUG": "Ebbanja erisigaddeyo",
+    "SW": "Salio la deni",
+    "AR": "رصيد الدين",
+    "FR": "Solde du crédit"
+  },
+  "Failed to record transaction.": {
+    "LUG": "Ekiwandiiko tekisobodde kuterekebwa.",
+    "SW": "Imeshindikana kurekodi muamala.",
+    "AR": "تعذّر تسجيل المعاملة.",
+    "FR": "Échec de l'enregistrement de la transaction."
+  },
+  "Failed to save transaction.": {
+    "LUG": "Ekiwandiiko tekisobodde kuterekebwa.",
+    "SW": "Imeshindikana kuhifadhi muamala.",
+    "AR": "تعذّر حفظ المعاملة.",
+    "FR": "Échec de l'enregistrement de la transaction."
+  },
+  "No question transcript was returned.": {
+    "LUG": "Ekibuuzo kyo tekiwuliddwa.",
+    "SW": "Swali lako halikusikika.",
+    "AR": "لم يتم التقاط سؤالك.",
+    "FR": "Votre question n'a pas été comprise."
+  },
+  "No answer was returned.": {
+    "LUG": "Tewali kya kuddamu kifuniddwa.",
+    "SW": "Hakuna jibu lililopatikana.",
+    "AR": "لم يتم تلقي أي إجابة.",
+    "FR": "Aucune réponse reçue."
+  },
+  "Not authenticated": {
+    "LUG": "Toyingidde. Ddamu oyingire.",
+    "SW": "Hujaingia. Tafadhali ingia tena.",
+    "AR": "لم تسجّل الدخول. يُرجى تسجيل الدخول مرة أخرى.",
+    "FR": "Non connecté. Veuillez vous reconnecter."
+  },
+  "No vendor account found with that business name. Please sign up first.": {
+    "LUG": "Tewali akawunti erina erinnya lya bizinensi eryo. Sooka owewandiise.",
+    "SW": "Hakuna akaunti yenye jina hilo la biashara. Tafadhali jisajili kwanza.",
+    "AR": "لا يوجد حساب بهذا الاسم التجاري. يُرجى إنشاء حساب أولًا.",
+    "FR": "Aucun compte ne porte ce nom de commerce. Veuillez d'abord vous inscrire."
+  },
+  "Too many incorrect attempts. Please try again later.": {
+    "LUG": "Ogezezzaako emirundi mingi nga PIN nkyamu. Ddamu oluvannyuma.",
+    "SW": "Majaribio mengi yasiyo sahihi. Tafadhali jaribu tena baadaye.",
+    "AR": "محاولات خاطئة كثيرة. يُرجى المحاولة لاحقًا.",
+    "FR": "Trop de tentatives incorrectes. Réessayez plus tard."
+  },
+  "Too many incorrect attempts. Please try again in 1 hour.": {
+    "LUG": "Ogezezzaako emirundi mingi nga PIN nkyamu. Ddamu oluvannyuma lw'essaawa emu.",
+    "SW": "Majaribio mengi yasiyo sahihi. Tafadhali jaribu tena baada ya saa 1.",
+    "AR": "محاولات خاطئة كثيرة. يُرجى المحاولة بعد ساعة.",
+    "FR": "Trop de tentatives incorrectes. Réessayez dans 1 heure."
+  },
+  "Incorrect PIN.": {
+    "LUG": "PIN nkyamu.",
+    "SW": "PIN si sahihi.",
+    "AR": "رمز PIN غير صحيح.",
+    "FR": "PIN incorrect."
+  },
+  "A vendor account with this business name already exists. Please log in instead, or choose a different business name.": {
+    "LUG": "Waliwo dda akawunti erina erinnya lino. Yingira, oba londa erinnya eddala.",
+    "SW": "Akaunti yenye jina hili la biashara tayari ipo. Tafadhali ingia, au chagua jina jingine.",
+    "AR": "يوجد حساب بهذا الاسم التجاري بالفعل. سجّل الدخول أو اختر اسمًا آخر.",
+    "FR": "Un compte porte déjà ce nom. Connectez-vous ou choisissez un autre nom."
+  },
+  "Business name is required": {
+    "LUG": "Erinnya lya bizinensi lyetaagisa",
+    "SW": "Jina la biashara linahitajika",
+    "AR": "اسم النشاط التجاري مطلوب",
+    "FR": "Le nom du commerce est obligatoire"
+  },
+  "PIN is required": {
+    "LUG": "PIN yeetaagisa",
+    "SW": "PIN inahitajika",
+    "AR": "رمز PIN مطلوب",
+    "FR": "Le PIN est obligatoire"
+  },
+  "PIN must be exactly 4 digits": {
+    "LUG": "PIN erina okuba ennamba 4 zokka",
+    "SW": "PIN lazima iwe tarakimu 4 hasa",
+    "AR": "يجب أن يتكون رمز PIN من 4 أرقام بالضبط",
+    "FR": "Le PIN doit comporter exactement 4 chiffres"
+  },
+  "Login failed. Please try again.": {
+    "LUG": "Okuyingira kulemye. Ddamu ogezeeko.",
+    "SW": "Kuingia kumeshindikana. Tafadhali jaribu tena.",
+    "AR": "فشل تسجيل الدخول. يُرجى المحاولة مرة أخرى.",
+    "FR": "Échec de la connexion. Veuillez réessayer."
+  },
+  "pin and businessName are required": {
+    "LUG": "PIN n'erinnya lya bizinensi byetaagisa",
+    "SW": "PIN na jina la biashara vinahitajika",
+    "AR": "رمز PIN واسم النشاط التجاري مطلوبان",
+    "FR": "Le PIN et le nom du commerce sont obligatoires"
+  },
+  "Could not create your account. Please try again.": {
+    "LUG": "Tetusobodde kuggulawo akawunti yo. Ddamu ogezeeko.",
+    "SW": "Imeshindikana kufungua akaunti yako. Tafadhali jaribu tena.",
+    "AR": "تعذّر إنشاء حسابك. يُرجى المحاولة مرة أخرى.",
+    "FR": "Impossible de créer votre compte. Veuillez réessayer."
+  },
+  "Could not log in. Please try again.": {
+    "LUG": "Tetusobodde kukuyingiza. Ddamu ogezeeko.",
+    "SW": "Imeshindikana kuingia. Tafadhali jaribu tena.",
+    "AR": "تعذّر تسجيل الدخول. يُرجى المحاولة مرة أخرى.",
+    "FR": "Connexion impossible. Veuillez réessayer."
+  },
+  "customer, item, and a positive amount are required": {
+    "LUG": "Omuguzi, ekintu, n'omuwendo ogusukka zero byetaagisa",
+    "SW": "Mteja, bidhaa, na kiasi chanya vinahitajika",
+    "AR": "العميل والصنف ومبلغ موجب مطلوبة",
+    "FR": "Client, article et montant positif obligatoires"
+  },
+  "Failed to record transaction": {
+    "LUG": "Ekiwandiiko tekisobodde kuterekebwa",
+    "SW": "Imeshindikana kurekodi muamala",
+    "AR": "تعذّر تسجيل المعاملة",
+    "FR": "Échec de l'enregistrement de la transaction"
+  },
+  "Customer name is required": {
+    "LUG": "Erinnya ly'omuguzi lyetaagisa",
+    "SW": "Jina la mteja linahitajika",
+    "AR": "اسم العميل مطلوب",
+    "FR": "Le nom du client est obligatoire"
+  },
+  "Item is required": {
+    "LUG": "Ekintu kyetaagisa",
+    "SW": "Bidhaa inahitajika",
+    "AR": "الصنف مطلوب",
+    "FR": "L'article est obligatoire"
+  },
+  "Total amount must be a valid number greater than 0": {
+    "LUG": "Omuwendo gwonna gulina okuba ennamba entuufu esukka zero",
+    "SW": "Jumla ya kiasi lazima iwe nambari sahihi zaidi ya 0",
+    "AR": "يجب أن يكون المبلغ الإجمالي رقمًا صحيحًا أكبر من 0",
+    "FR": "Le montant total doit être un nombre valide supérieur à 0"
+  },
+  "Payment type must be cash or credit": {
+    "LUG": "Engeri y'okusasula erina okuba ssente nkalu oba ebbanja",
+    "SW": "Aina ya malipo lazima iwe taslimu au mkopo",
+    "AR": "يجب أن تكون طريقة الدفع نقدًا أو آجلًا",
+    "FR": "Le mode de paiement doit être comptant ou crédit"
+  },
+  "Invalid due date": {
+    "LUG": "Olunaku lw'okusasula si lutuufu",
+    "SW": "Tarehe ya malipo si sahihi",
+    "AR": "تاريخ الاستحقاق غير صالح",
+    "FR": "Date d'échéance invalide"
+  },
+  "Transaction not found": {
+    "LUG": "Ekiwandiiko tekizuuliddwa",
+    "SW": "Muamala haukupatikana",
+    "AR": "المعاملة غير موجودة",
+    "FR": "Transaction introuvable"
+  },
+  "Failed to update transaction": {
+    "LUG": "Ekiwandiiko tekisobodde kukyusibwa",
+    "SW": "Imeshindikana kusasisha muamala",
+    "AR": "تعذّر تحديث المعاملة",
+    "FR": "Échec de la mise à jour de la transaction"
+  },
+  "Failed to delete transaction": {
+    "LUG": "Ekiwandiiko tekisobodde kusazibwamu",
+    "SW": "Imeshindikana kufuta muamala",
+    "AR": "تعذّر حذف المعاملة",
+    "FR": "Échec de la suppression de la transaction"
+  },
+  "Could not update profile": {
+    "LUG": "Ebikukwatako tebisobodde kukyusibwa",
+    "SW": "Imeshindikana kusasisha wasifu",
+    "AR": "تعذّر تحديث الملف الشخصي",
+    "FR": "Impossible de mettre à jour le profil"
+  },
+  "Audio file is empty": {
+    "LUG": "Eddoboozi teririmu kintu",
+    "SW": "Rekodi ya sauti haina kitu",
+    "AR": "ملف الصوت فارغ",
+    "FR": "L'enregistrement est vide"
+  },
+  "Audio file exceeds maximum allowed size (50MB)": {
+    "LUG": "Eddoboozi linene nnyo (ekkomo 50MB)",
+    "SW": "Rekodi ya sauti ni kubwa mno (kikomo 50MB)",
+    "AR": "ملف الصوت أكبر من الحد المسموح (50 ميغابايت)",
+    "FR": "L'enregistrement dépasse la taille maximale (50 Mo)"
+  },
+  "Failed to read audio file": {
+    "LUG": "Eddoboozi teryasobodde kusomebwa",
+    "SW": "Imeshindikana kusoma rekodi ya sauti",
+    "AR": "تعذّرت قراءة ملف الصوت",
+    "FR": "Impossible de lire l'enregistrement"
+  },
+  "Audio file is required": {
+    "LUG": "Eddoboozi lyetaagisa",
+    "SW": "Rekodi ya sauti inahitajika",
+    "AR": "ملف الصوت مطلوب",
+    "FR": "Un enregistrement est requis"
+  },
+  "Sunbird STT request failed": {
+    "LUG": "Tetusobodde kuwuliriza ddoboozi lyo. Ddamu ogezeeko.",
+    "SW": "Imeshindikana kusikiliza sauti yako. Tafadhali jaribu tena.",
+    "AR": "تعذّر فهم صوتك. يُرجى المحاولة مرة أخرى.",
+    "FR": "Impossible d'écouter votre message. Veuillez réessayer."
+  },
+  "No transcript returned from Sunbird": {
+    "LUG": "Tetusobodde kutegeera ky'oyogedde. Ddamu ogezeeko.",
+    "SW": "Hatukuelewa ulichosema. Tafadhali jaribu tena.",
+    "AR": "لم نتمكن من فهم ما قلته. يُرجى المحاولة مرة أخرى.",
+    "FR": "Nous n'avons pas compris votre message. Veuillez réessayer."
+  },
+  "Gemini returned invalid intent JSON": {
+    "LUG": "Tetusobodde kutegeera kibuuzo kyo. Ddamu ogezeeko.",
+    "SW": "Hatukuelewa swali lako. Tafadhali jaribu tena.",
+    "AR": "لم نتمكن من فهم سؤالك. يُرجى المحاولة مرة أخرى.",
+    "FR": "Nous n'avons pas compris votre question. Veuillez réessayer."
+  },
+  "Sunbird TTS request failed": {
+    "LUG": "Tetusobodde kukola ddoboozi lya kuddamu.",
+    "SW": "Imeshindikana kutengeneza jibu la sauti.",
+    "AR": "تعذّر إنشاء الرد الصوتي.",
+    "FR": "Impossible de générer la réponse vocale."
+  },
+  "Sunbird TTS did not return an audio URL": {
+    "LUG": "Tetusobodde kukola ddoboozi lya kuddamu.",
+    "SW": "Imeshindikana kutengeneza jibu la sauti.",
+    "AR": "تعذّر إنشاء الرد الصوتي.",
+    "FR": "Impossible de générer la réponse vocale."
+  },
+  "Voice assistant request failed": {
+    "LUG": "Omuyambi w'eddoboozi alemereddwa. Ddamu ogezeeko.",
+    "SW": "Msaidizi wa sauti ameshindwa. Tafadhali jaribu tena.",
+    "AR": "فشل المساعد الصوتي. يُرجى المحاولة مرة أخرى.",
+    "FR": "L'assistant vocal a échoué. Veuillez réessayer."
+  },
+  "customerName is required": {
+    "LUG": "Erinnya ly'omuguzi lyetaagisa",
+    "SW": "Jina la mteja linahitajika",
+    "AR": "اسم العميل مطلوب",
+    "FR": "Le nom du client est obligatoire"
+  },
+  "Failed to record payment": {
+    "LUG": "Okusasula tekusobodde kuwandiikibwa",
+    "SW": "Imeshindikana kurekodi malipo",
+    "AR": "تعذّر تسجيل الدفعة",
+    "FR": "Échec de l'enregistrement du paiement"
+  },
+  "Uganda": {
+    "LUG": "Yuganda",
+    "SW": "Uganda",
+    "AR": "أوغندا",
+    "FR": "Ouganda"
+  },
+  "Kenya": {
+    "LUG": "Kenya",
+    "SW": "Kenya",
+    "AR": "كينيا",
+    "FR": "Kenya"
+  },
+  "Tanzania": {
+    "LUG": "Tanzania",
+    "SW": "Tanzania",
+    "AR": "تنزانيا",
+    "FR": "Tanzanie"
+  },
+  "Rwanda": {
+    "LUG": "Rwanda",
+    "SW": "Rwanda",
+    "AR": "رواندا",
+    "FR": "Rwanda"
+  },
+  "Burundi": {
+    "LUG": "Burundi",
+    "SW": "Burundi",
+    "AR": "بوروندي",
+    "FR": "Burundi"
+  },
+  "South Sudan": {
+    "LUG": "Sudani ey'Omu Bukiikaddyo",
+    "SW": "Sudan Kusini",
+    "AR": "جنوب السودان",
+    "FR": "Soudan du Sud"
+  },
+  "Democratic Republic of the Congo": {
+    "LUG": "Kongo (DRC)",
+    "SW": "Jamhuri ya Kidemokrasia ya Kongo",
+    "AR": "جمهورية الكونغو الديمقراطية",
+    "FR": "République démocratique du Congo"
+  },
+  "Nigeria": {
+    "LUG": "Nayijeriya",
+    "SW": "Nigeria",
+    "AR": "نيجيريا",
+    "FR": "Nigeria"
+  },
+  "Ghana": {
+    "LUG": "Gana",
+    "SW": "Ghana",
+    "AR": "غانا",
+    "FR": "Ghana"
+  },
+  "South Africa": {
+    "LUG": "South Africa",
+    "SW": "Afrika Kusini",
+    "AR": "جنوب أفريقيا",
+    "FR": "Afrique du Sud"
+  },
+  "United Kingdom": {
+    "LUG": "Bungereza",
+    "SW": "Uingereza",
+    "AR": "المملكة المتحدة",
+    "FR": "Royaume-Uni"
+  },
+  "United States": {
+    "LUG": "Amerika",
+    "SW": "Marekani",
+    "AR": "الولايات المتحدة",
+    "FR": "États-Unis"
+  }
+}
