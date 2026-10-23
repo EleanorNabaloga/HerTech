@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
+import { clearSessionCookie } from "@/lib/session";
 
 export async function POST() {
   const response = NextResponse.json({ success: true });
-  response.cookies.set({
-    name: "duukatalk_vendor_id",
-    value: "",
-    expires: new Date(0),
-    path: "/",
-  });
+  clearSessionCookie(response);
   return response;
 }

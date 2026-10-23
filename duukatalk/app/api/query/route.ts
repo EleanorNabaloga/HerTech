@@ -1,4 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getVendorCurrency } from "@/lib/auth";
+import { getSessionVendorId } from "@/lib/session";
 import { NextRequest } from "next/server";
 
 import { QUERY_CLASSIFICATION_PROMPT } from "@/lib/prompts";
@@ -8,13 +10,12 @@ const genAI = new GoogleGenerativeAI(
   process.env.GEMINI_API_KEY!
 );
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 export async function POST(req: NextRequest) {
   try {
     // 1. Get the logged-in vendor ID from the authentication cookie.
     const vendorId =
-      req.cookies.get(AUTH_COOKIE_NAME)?.value;
+      getSessionVendorId(req);
 
     if (!vendorId) {
       return Response.json(
@@ -186,7 +187,8 @@ export async function POST(req: NextRequest) {
       // filters Firestore transactions by vendor_id.
       answerText =
         await buildDailySummary(
-          vendorId
+          vendorId,
+          await getVendorCurrency(vendorId)
         );
     } else if (
       intent.query_type ===

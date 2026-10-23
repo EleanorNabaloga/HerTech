@@ -43,8 +43,13 @@ import {
 import {
   LANGUAGE_OPTIONS,
   Language,
+  TranslationVars,
+  applyDocumentLanguage,
+  hasTranslation,
+  localeFor,
   translate,
 } from '@/lib/i18n';
+import { CREDIT_LIMIT } from '@/lib/credit';
 
 type TabType = 'record' | 'ledgers' | 'debts' | 'reports';
 
@@ -66,6 +71,7 @@ interface Transaction {
   item: string;
   amount: number;
   type: 'cash' | 'credit';
+  // Raw stored date (ISO or YYYY-MM-DD); formatted only when displayed.
   dueDate?: string;
   date: string;
   timestamp?: string;
@@ -77,7 +83,7 @@ interface Debt {
   initials: string;
   item: string;
   amount: number;
-  dueDate: string;
+  dueDate?: string;
 }
 
 interface ApiTransaction {
@@ -102,6 +108,7 @@ interface ApiSummary {
   savingsPercent?: number;
   loanReadinessScore?: number;
   loanAdvice?: string;
+  adviceCode?: 'stop_lending' | 'cautious' | 'healthy';
   creditToSalesRatio?: number;
   creditSharePercent?: number;
   shouldStopLending?: boolean;
@@ -187,29 +194,17 @@ function deriveInitials(name: string): string {
   return initials || '??';
 }
 
-function safeFormatDate(value?: string | null): string | undefined {
-  if (!value) return undefined;
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return undefined;
-  }
-
-  return parsed.toLocaleDateString();
+function isValidDate(value?: string | null): value is string {
+  return Boolean(value) && !Number.isNaN(new Date(value as string).getTime());
 }
 
-function safeFormatDateTime(value?: string | null): string {
-  if (!value) return 'Just now';
-
-  const parsed = new Date(value);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return 'Just now';
-  }
-
-  return parsed.toLocaleString();
+/** Earliest valid due date, kept raw so it can be formatted per language. */
+function earliestDueDate(dueDates: string[]): string | undefined {
+  return dueDates
+    .filter(isValidDate)
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())[0];
 }
+
 function formatCurrency(
   amount: number,
   currency?: string
@@ -338,26 +333,74 @@ const [questionError, setQuestionError] =
 
   const text = (
     english: string,
-    legacyLuganda?: string
-  ) => {
-    void legacyLuganda;
-    return translate(language, english);
+    vars?: TranslationVars
+  ) => translate(language, english, vars);
+
+  useEffect(() => {
+    applyDocumentLanguage(language);
+  }, [language]);
+
+  // Display helpers: data keeps raw dates and English placeholder values
+  // (e.g. 'Unknown customer'); these turn them into the chosen language.
+  const locale = localeFor(language);
+
+  const formatDay = (value?: string | null) =>
+    isValidDate(value)
+      ? new Date(value).toLocaleDateString(locale)
+      : '';
+
+  const dueLabel = (value?: string | null) =>
+    isValidDate(value)
+      ? text('Due {date}', { date: formatDay(value) })
+      : text('No due date');
+
+  const whenLabel = (value?: string | null) =>
+    isValidDate(value)
+      ? new Date(value).toLocaleString(locale)
+      : text('Just now');
+
+  const shown = (value: string) =>
+    hasTranslation(value) ? text(value) : value;
+
+  // Coach advice is built here (not on the server) so it follows the chosen
+  // language and the vendor's own currency.
+  const coachAdvice = (data: ApiSummary) => {
+    const vars = {
+      share: data.creditSharePercent ?? 0,
+      percent: data.savingsPercent ?? 0,
+      amount: formatCurrency(
+        data.recommendedSavings ?? 0,
+        user.currency
+      ),
+    };
+
+    if (data.adviceCode === 'stop_lending') {
+      return text(
+        'Stop giving new credit now. Credit is {share}% of sales, which is too high. First collect debts and save {percent}% of sales, about {amount}. A clear savings record can help banks trust you.',
+        vars
+      );
+    }
+
+    if (data.adviceCode === 'cautious') {
+      return text(
+        'Cash is okay, but credit is {share}% of sales. Be careful with new credit. Collect repayments, save {percent}% of sales, about {amount}, and keep a simple savings record. This helps banks see you as ready for a loan.',
+        vars
+      );
+    }
+
+    return text(
+      'Sales are stronger than credit. Keep giving credit carefully, save {percent}% of sales, about {amount}, and keep saving every week. This helps banks trust your sales record and may help you get a loan.',
+      vars
+    );
   };
 
   const loadApiData = async () => {
     setIsLoadingData(true);
     setApiError('');
 
-    const routeLanguage =
-      language === 'LUG'
-        ? 'LUG'
-        : language === 'SW'
-          ? 'MIX'
-          : language === 'AR'
-            ? 'MIX'
-            : language === 'FR'
-              ? 'MIX'
-              : 'EN';
+    // Ask the server for the chosen language itself. Kiswahili, Arabic and
+    // French used to request 'MIX', which returned English + Luganda together.
+    const routeLanguage = language;
 
     const responses = await Promise.allSettled([
       fetch('/api/ledger'),
@@ -452,17 +495,9 @@ const [questionError, setQuestionError] =
                   ? 'credit'
                   : 'cash',
 
-              dueDate: transaction.due_date
-                ? `Due ${new Date(
-                    transaction.due_date
-                  ).toLocaleDateString()}`
-                : undefined,
+              dueDate: transaction.due_date || undefined,
 
-              date: transaction.timestamp
-                ? new Date(
-                    transaction.timestamp
-                  ).toLocaleString()
-                : 'Recently',
+              date: transaction.timestamp || '',
 
               timestamp: transaction.timestamp,
             };
@@ -502,10 +537,7 @@ const [questionError, setQuestionError] =
             initials: deriveInitials(customer),
             item: 'Credit balance',
             amount,
-            dueDate:
-              dueDates.length > 0
-                ? dueDates[0]
-                : 'No due date',
+            dueDate: earliestDueDate(dueDates),
           };
         });
 
@@ -594,10 +626,7 @@ const [questionError, setQuestionError] =
             initials: deriveInitials(customer),
             item: 'Credit balance',
             amount,
-            dueDate:
-              dueDates.length > 0
-                ? dueDates[0]
-                : 'No due date',
+            dueDate: earliestDueDate(dueDates),
           };
         }
       );
@@ -627,9 +656,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'Syncing offline records...',
-          'Teegeyuza ku database...'
-        )
+          'Syncing offline records...')
       );
 
       try {
@@ -644,16 +671,17 @@ const [questionError, setQuestionError] =
         ) {
           setFormMessage(
             text(
-              `Synced ${transactionSync.synced} offline transaction${transactionSync.synced === 1 ? '' : 's'} and ${voiceSync.synced} voice note${voiceSync.synced === 1 ? '' : 's'} to the ledger.`,
-              `Tukyuza ${transactionSync.synced} offline transaction${transactionSync.synced === 1 ? '' : 's'} ne ${voiceSync.synced} voice note${voiceSync.synced === 1 ? '' : 's'} ku ledger.`
+              'Synced offline records to the ledger: {transactions} transactions, {notes} voice notes.',
+              {
+                transactions: transactionSync.synced,
+                notes: voiceSync.synced,
+              }
             )
           );
         } else {
           setFormMessage(
             text(
-              'No offline records to sync.',
-              'Tewali offline records ku sync.'
-            )
+              'No offline records to sync.')
           );
         }
 
@@ -662,9 +690,7 @@ const [questionError, setQuestionError] =
         console.error('Failed to sync offline queue:', error);
         setFormMessage(
           text(
-            'Offline sync failed. It will retry automatically when the network is back.',
-            'Offline sync yabaddewo ekizibu. Ejja kugezebwa nga network eddawo.'
-          )
+            'Offline sync failed. It will retry automatically when the network is back.')
         );
       } finally {
         syncInFlightRef.current = false;
@@ -723,10 +749,13 @@ const [questionError, setQuestionError] =
   })),
 
   ...debts
-    .filter((debt) => debt.amount > 200000)
+    .filter((debt) => debt.amount > CREDIT_LIMIT)
     .map((debt) => ({
       id: `debt-${debt.id}`,
-      message: `${debt.customer} has an outstanding debt of UGX ${debt.amount.toLocaleString()}.`,
+      message: text('{customer} has an outstanding debt of {amount}.', {
+        customer: shown(debt.customer),
+        amount: formatCurrency(debt.amount, user.currency),
+      }),
     })),
 
   ...debts
@@ -739,7 +768,9 @@ const [questionError, setQuestionError] =
     })
     .map((debt) => ({
       id: `overdue-${debt.id}`,
-      message: `${debt.customer}'s debt is overdue.`,
+      message: text("{customer}'s debt is overdue.", {
+        customer: shown(debt.customer),
+      }),
     })),
 ];
 
@@ -788,9 +819,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'Entry saved successfully after warning approval.',
-          'Ekiwandiiko kiteekeddwa bulungi olw\u2019okukkiriza okulabula.'
-        )
+          'Entry saved successfully after warning approval.')
       );
 
       await loadApiData();
@@ -798,9 +827,7 @@ const [questionError, setQuestionError] =
       console.error('Manual warning approval failed:', error);
       setFormMessage(
         text(
-          'The warning-approved record could not be saved.',
-          'Ekiwandiiko ekirina okulabula tekisoboka kukwatibwa.'
-        )
+          'The warning-approved record could not be saved.')
       );
     } finally {
       setCreditWarning(null);
@@ -830,27 +857,25 @@ const [questionError, setQuestionError] =
         } | null;
 
         setMicError(errorData?.error || text(
-          'The voice service did not respond. Please try again.',
-          'Sevesi y\u2019okuwandiika teziddemu. Ddamu ogezeeko.'
-        ));
+          'The voice service did not respond. Please try again.'));
         setCreditWarning(null);
         return;
       }
 
       const data = (await response.json()) as VoiceToJsonResponse;
       if (!data.success || !data.transaction || !data.transactionId) {
-        setMicError(text('Could not understand the recording. Please try again.', 'Tetusobodde kutegeera ky\u2019owogedde. Ddamu ogezeeko.'));
+        setMicError(text('Could not understand the recording. Please try again.'));
         setCreditWarning(null);
         return;
       }
 
-      setFormMessage(text('Voice record saved after warning approval.', 'Okurekoda kwateekebwa oluvannyuma okulabula okukkirizibwa.'));
+      setFormMessage(text('Voice record saved after warning approval.'));
       setAudioTransactionLinkView(data.transactionId);
       setCreditWarning(null);
       await loadApiData();
     } catch (error) {
       console.error('Voice warning approval failed:', error);
-      setMicError(text('The voice record could not be saved after the warning approval.', 'Okurekoda tekusoboka kuteekebwa olw\u2019okukkiriza okulabula.'));
+      setMicError(text('The voice record could not be saved after the warning approval.'));
     } finally {
       setIsProcessing(false);
     }
@@ -875,7 +900,7 @@ const [questionError, setQuestionError] =
   const handleSavePrivacy = async () => {
     if (newPin && !/^\d{4}$/.test(newPin)) {
       setSettingsMessage(
-        'PIN must be exactly 4 digits.'
+        text('PIN must be exactly 4 digits.')
       );
 
       return;
@@ -904,7 +929,7 @@ const [questionError, setQuestionError] =
     if (!response.ok) {
       setSettingsMessage(
         data?.error ||
-          'Could not save privacy settings.'
+          text('Could not save privacy settings.')
       );
 
       return;
@@ -927,7 +952,7 @@ const [questionError, setQuestionError] =
 
     setNewPin('');
     setSettingsMessage(
-      'Privacy settings saved.'
+      text('Privacy settings saved.')
     );
   };
 
@@ -962,11 +987,8 @@ const [questionError, setQuestionError] =
       item: transaction.item,
       amount: String(transaction.amount),
       paymentType: transaction.type,
-      dueDate:
-        transaction.dueDate?.replace(
-          /^Due\s+/i,
-          ''
-        ) || '',
+      // The date input needs YYYY-MM-DD.
+      dueDate: transaction.dueDate?.slice(0, 10) || '',
     });
   };
 
@@ -1001,9 +1023,7 @@ const [questionError, setQuestionError] =
     ) {
       setEditError(
         text(
-          'Please enter a customer, item, and valid amount.',
-          'Sooka oteekemu omuguzi, ekyaguddwa n\u2019omuwendo omutuufu.'
-        )
+          'Please enter a customer, item, and valid amount.')
       );
 
       return;
@@ -1046,9 +1066,7 @@ const [questionError, setQuestionError] =
         throw new Error(
           data?.error ||
             text(
-              'Failed to update transaction.',
-              'Ekiwandiiko kigaanye okukyusibwa.'
-            )
+              'Failed to update transaction.')
         );
       }
 
@@ -1073,7 +1091,7 @@ const [questionError, setQuestionError] =
                       editFormData.paymentType ===
                         'credit' &&
                       editFormData.dueDate.trim()
-                        ? `Due ${editFormData.dueDate.trim()}`
+                        ? editFormData.dueDate.trim()
                         : undefined,
                   }
                 : transaction
@@ -1084,9 +1102,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'Transaction updated successfully.',
-          'Ekiwandiiko kikyusiddwa bulungi.'
-        )
+          'Transaction updated successfully.')
       );
 
       try {
@@ -1109,9 +1125,7 @@ const [questionError, setQuestionError] =
         error instanceof Error
           ? error.message
           : text(
-              'Failed to update transaction.',
-              'Ekiwandiiko kigaanye okukyusibwa.'
-            )
+              'Failed to update transaction.')
       );
     } finally {
       setIsSavingEdit(false);
@@ -1164,9 +1178,7 @@ const [questionError, setQuestionError] =
         throw new Error(
           data?.error ||
             text(
-              'Failed to delete transaction.',
-              'Ekiwandiiko kigaanye okuggyibwawo.'
-            )
+              'Failed to delete transaction.')
         );
       }
 
@@ -1191,9 +1203,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'Transaction deleted successfully.',
-          'Ekiwandiiko kigiddwaawo bulungi.'
-        )
+          'Transaction deleted successfully.')
       );
 
       try {
@@ -1216,9 +1226,7 @@ const [questionError, setQuestionError] =
         error instanceof Error
           ? error.message
           : text(
-              'Failed to delete transaction.',
-              'Ekiwandiiko kigaanye okuggyibwawo.'
-            )
+              'Failed to delete transaction.')
       );
     } finally {
       setIsDeletingTransaction(false);
@@ -1243,9 +1251,7 @@ const [questionError, setQuestionError] =
     ) {
       setFormMessage(
         text(
-          'Add a customer, item, and amount first.',
-          'Sooka omuguzi, ekyaguddwa, n\u2019omuwendo nga tonnaba kusiba.'
-        )
+          'Add a customer, item, and amount first.')
       );
 
       return;
@@ -1263,11 +1269,8 @@ const [questionError, setQuestionError] =
       item: itemName,
       amount,
       type: paymentType,
-      dueDate:
-        paymentType === 'credit'
-          ? 'Due soon'
-          : undefined,
-      date: 'Just now',
+      dueDate: undefined,
+      date: new Date().toISOString(),
       timestamp: new Date().toISOString(),
     };
 
@@ -1277,10 +1280,9 @@ const [questionError, setQuestionError] =
       item: itemName,
       amount,
       paymentType,
-      dueDate:
-        paymentType === 'credit'
-          ? new Date().toISOString()
-          : null,
+      // The manual form has no due date field; saving "now" made every
+      // credit sale instantly overdue (and triggered overdue SMS).
+      dueDate: null,
       phone: user.phone || null,
       createdAt: new Date().toISOString(),
     };
@@ -1300,7 +1302,7 @@ const [questionError, setQuestionError] =
         setDebts((currentDebts) => [
           {
             ...newTransaction,
-            dueDate: 'Due soon',
+            dueDate: undefined,
           },
           ...currentDebts,
         ]);
@@ -1315,9 +1317,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'You are offline. The entry was saved to the offline queue.',
-          'Tewali network. Ekiwandiiko kiteekeddwa mu offline queue.'
-        )
+          'You are offline. The entry was saved to the offline queue.')
       );
 
       setActiveTab('ledgers');
@@ -1330,10 +1330,9 @@ const [questionError, setQuestionError] =
       item: itemName,
       amount,
       paymentType,
-      dueDate:
-        paymentType === 'credit'
-          ? new Date().toISOString()
-          : null,
+      // The manual form has no due date field; saving "now" made every
+      // credit sale instantly overdue (and triggered overdue SMS).
+      dueDate: null,
       phone: user.phone || null,
       language,
       acknowledgedWarning: false,
@@ -1383,7 +1382,7 @@ const [questionError, setQuestionError] =
           {
             ...newTransaction,
             id: data?.id || newTransaction.id,
-            dueDate: 'Due soon',
+            dueDate: undefined,
           },
           ...currentDebts,
         ]);
@@ -1398,9 +1397,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'Entry saved successfully.',
-          'Ekiwandiiko kiteekeddwa bulungi.'
-        )
+          'Entry saved successfully.')
       );
 
       setActiveTab('ledgers');
@@ -1419,7 +1416,7 @@ const [questionError, setQuestionError] =
           setDebts((currentDebts) => [
             {
               ...newTransaction,
-              dueDate: 'Due soon',
+              dueDate: undefined,
             },
             ...currentDebts,
           ]);
@@ -1434,9 +1431,7 @@ const [questionError, setQuestionError] =
 
         setFormMessage(
           text(
-            'You are offline. The entry was saved to the offline queue.',
-            'Tewali network. Ekiwandiiko kiteekeddwa mu offline queue.'
-          )
+            'You are offline. The entry was saved to the offline queue.')
         );
 
         setActiveTab('ledgers');
@@ -1446,10 +1441,9 @@ const [questionError, setQuestionError] =
 
       console.error('Manual entry save failed:', error);
       setFormMessage(
-        text(
-          `Entry could not be saved: ${reason}`,
-          `Ekiwandiiko tekisoboka kukwatibwa: ${reason}`
-        )
+        text('Entry could not be saved: {reason}', {
+          reason: shown(reason),
+        })
       );
 
       if (reason.includes('Not authenticated')) {
@@ -1465,20 +1459,26 @@ const [questionError, setQuestionError] =
   const handleExport = () => {
     const csvRows = [
       [
-        'Customer',
-        'Item',
-        'Amount (UGX)',
-        'Type',
-        'Date',
+        text('Customer'),
+        text('Item'),
+        text('Amount ({currency})', {
+          currency: user.currency || 'UGX',
+        }),
+        text('Type'),
+        text('Date'),
       ],
 
       ...filteredTransactions.map(
         (transaction) => [
-          transaction.customer,
-          transaction.item,
+          shown(transaction.customer),
+          shown(transaction.item),
           String(transaction.amount),
-          transaction.type,
-          transaction.date,
+          transaction.type === 'cash'
+            ? text('Cash')
+            : text('Credit'),
+          whenLabel(
+            transaction.timestamp || transaction.date
+          ),
         ]
       ),
     ];
@@ -1581,9 +1581,7 @@ const [questionError, setQuestionError] =
         setMicError(
           errorData?.error ||
             text(
-              'The voice service did not respond. Please try again.',
-              'Sevesi y\u2019okuwandiika teziddemu. Ddamu ogezeeko.'
-            )
+              'The voice service did not respond. Please try again.')
         );
 
         return;
@@ -1597,9 +1595,7 @@ const [questionError, setQuestionError] =
       } catch {
         setMicError(
           text(
-            'Received an unexpected response. Please try again.',
-            'Twafunye eky\u2019okuddamu ekitategeerekeka. Ddamu ogezeeko.'
-          )
+            'Received an unexpected response. Please try again.')
         );
 
         return;
@@ -1613,9 +1609,7 @@ const [questionError, setQuestionError] =
         setMicError(
           data?.error ||
             text(
-              'Could not understand the recording. Please try again.',
-              'Tetusobodde kutegeera ky\u2019owogedde. Ddamu ogezeeko.'
-            )
+              'Could not understand the recording. Please try again.')
         );
 
         return;
@@ -1630,9 +1624,7 @@ const [questionError, setQuestionError] =
 
         setMicError(
           text(
-            'The transaction was processed, but its database ID was missing. Please refresh and try again.',
-            'Ekiwandiiko kikolebwa naye ID yaakyo mu database ebula. Ddamu orefreshing ogezeeko.'
-          )
+            'The transaction was processed, but its database ID was missing. Please refresh and try again.')
         );
 
         return;
@@ -1686,20 +1678,13 @@ const [questionError, setQuestionError] =
         itemParts.length > 0
           ? itemParts.join(' ')
           : text(
-              'Recorded item',
-              'Ekintu ekiwandiikiddwa'
-            );
+              'Recorded item');
 
       const paymentType: Transaction['type'] =
         voiceTx.paymentType ===
         'credit'
           ? 'credit'
           : 'cash';
-
-      const dueDateLabel =
-        safeFormatDate(
-          voiceTx.dueDate
-        );
 
       const newTransaction: Transaction = {
         id: data.transactionId,
@@ -1717,18 +1702,11 @@ const [questionError, setQuestionError] =
 
         type: paymentType,
 
-        dueDate:
-          paymentType === 'credit'
-            ? dueDateLabel
-              ? `Due ${dueDateLabel}`
-              : 'Due soon'
-            : dueDateLabel
-              ? `Due ${dueDateLabel}`
-              : undefined,
+        dueDate: voiceTx.dueDate || undefined,
 
-        date: safeFormatDateTime(
-          voiceTx.timestamp
-        ),
+        date:
+          voiceTx.timestamp ||
+          new Date().toISOString(),
       };
 
       setTranscript(
@@ -1759,8 +1737,7 @@ const [questionError, setQuestionError] =
               amount:
                 newTransaction.amount,
               dueDate:
-                newTransaction.dueDate ||
-                'Due soon',
+                newTransaction.dueDate,
             },
             ...currentDebts,
           ]
@@ -1769,9 +1746,7 @@ const [questionError, setQuestionError] =
 
       setFormMessage(
         text(
-          'Entry saved from your voice recording.',
-          'Ekiwandiiko kiteekeddwa okuva mu ky\u2019owogedde.'
-        )
+          'Entry saved from your voice recording.')
       );
 
       setActiveTab('ledgers');
@@ -1790,9 +1765,7 @@ const [questionError, setQuestionError] =
 
         setFormMessage(
           text(
-            'You are offline. The recording is queued to sync when internet returns.',
-            'Tewali network. Okurekoda kujja kuteekebwa mu queue okutuuka network lw\u2019erabuka.'
-          )
+            'You are offline. The recording is queued to sync when internet returns.')
         );
       } catch (queueError) {
         console.error(
@@ -1802,9 +1775,7 @@ const [questionError, setQuestionError] =
 
         setMicError(
           text(
-            'Something went wrong uploading your recording. Please check your connection and try again.',
-            'Wabaddewo ekizibu nga tuwaayo ky\u2019owogedde. Kebera network yo oyongere ogezeeko.'
-          )
+            'Something went wrong uploading your recording. Please check your connection and try again.')
         );
       }
     } finally {
@@ -1822,9 +1793,7 @@ const [questionError, setQuestionError] =
     ) {
       setMicError(
         text(
-          'Microphone access is not supported in this browser.',
-          'Ekyuma kino tekiyinza kukozesa mikirofoni.'
-        )
+          'Microphone access is not supported in this browser.')
       );
 
       return;
@@ -1836,9 +1805,7 @@ const [questionError, setQuestionError] =
     ) {
       setMicError(
         text(
-          'Voice recording is not supported in this browser.',
-          'Okuwandiika mu ddoboozi tekukoleddwa ku kyuma kino.'
-        )
+          'Voice recording is not supported in this browser.')
       );
 
       return;
@@ -1918,9 +1885,7 @@ const [questionError, setQuestionError] =
 
         setMicError(
           text(
-            'Recording failed. Please try again.',
-            'Okuwandiika kugaanye. Ddamu ogezeeko.'
-          )
+            'Recording failed. Please try again.')
         );
       };
 
@@ -1935,9 +1900,7 @@ const [questionError, setQuestionError] =
 
       setMicError(
         text(
-          'Microphone access was denied or unavailable.',
-          'Tetuyinzizza kukozesa mikirofoni.'
-        )
+          'Microphone access was denied or unavailable.')
       );
     }
   };
@@ -1974,48 +1937,32 @@ const [questionError, setQuestionError] =
   const micStatusText =
     isProcessing
       ? text(
-          'Processing...',
-          'Nkola...'
-        )
+          'Processing...')
       : isRecording
         ? text(
-            'Listening...',
-            'Mpuliriza...'
-          )
+            'Listening...')
         : text(
-            'Tap to Speak',
-            'Nyiga Owogerere'
-          );
+            'Tap to Speak');
 
   const micAriaLabel =
     isProcessing
       ? text(
-          'Processing recording',
-          'Nkola ku ky\u2019owogedde'
-        )
+          'Processing recording')
       : isRecording
         ? text(
-            'Stop recording',
-            'Koma okuwandiika'
-          )
+            'Stop recording')
         : text(
-            'Start recording',
-            'Tandika okuwandiika'
-          );
+            'Start recording');
 
   const micStatusMessage =
     isProcessing
       ? text(
-          'Processing your recording\u2026',
-          'Tukola ku ky\u2019owogedde\u2026'
-        )
+          'Processing your recording\u2026')
       : micError
-        ? micError
+        ? shown(micError)
         : transcript
           ? `${text(
-              'Heard',
-              'Kye mpulidde'
-            )}: "${transcript}"`
+              'Heard')}: "${transcript}"`
           : '';
 
 
@@ -2044,9 +1991,7 @@ const startQuestionRecording = async () => {
       typeof window === 'undefined' ||
       !navigator.mediaDevices?.getUserMedia
     ) {
-      setQuestionError(
-        'Microphone access is not supported in this browser.'
-      );
+      setQuestionError(text('Microphone access is not supported in this browser.'));
 
       return;
     }
@@ -2055,9 +2000,7 @@ const startQuestionRecording = async () => {
       typeof MediaRecorder ===
       'undefined'
     ) {
-      setQuestionError(
-        'Voice recording is not supported in this browser.'
-      );
+      setQuestionError(text('Voice recording is not supported in this browser.'));
 
       return;
     }
@@ -2145,9 +2088,7 @@ console.log('Question audio:', {
 
       setIsQuestionRecording(false);
 
-      setQuestionError(
-        'Recording failed. Please try again.'
-      );
+      setQuestionError(text('Recording failed. Please try again.'));
     };
 
     recorder.start();
@@ -2168,9 +2109,7 @@ console.log('Question audio:', {
 
     setIsQuestionRecording(false);
 
-    setQuestionError(
-      'Could not access the microphone.'
-    );
+    setQuestionError(text('Could not access the microphone.'));
   }
 };
   const stopQuestionRecording = () => {
@@ -2267,9 +2206,7 @@ console.log('Question audio:', {
           setIsQuestionSpeaking(false);
           questionAudioRef.current = null;
 
-          setQuestionError(
-            'I could not play the spoken response.'
-          );
+          setQuestionError(text('I could not play the spoken response.'));
         };
 
         try {
@@ -2282,9 +2219,7 @@ console.log('Question audio:', {
 
           setIsQuestionSpeaking(false);
 
-          setQuestionError(
-            'The answer is ready, but I could not play the audio.'
-          );
+          setQuestionError(text('The answer is ready, but I could not play the audio.'));
         }
       }
     } catch (error) {
@@ -2295,8 +2230,8 @@ console.log('Question audio:', {
 
       setQuestionError(
         error instanceof Error
-          ? error.message
-          : 'Could not process your question.'
+          ? shown(error.message)
+          : text('Could not process your question.')
       );
     } finally {
       setIsQuestionProcessing(false);
@@ -2338,7 +2273,7 @@ console.log('Question audio:', {
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-sm">
-                Your Business
+                {text('Your Business')}
               </span>
 
               <span className="text-sm">
@@ -2347,13 +2282,13 @@ console.log('Question audio:', {
             </div>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              DuukaTalk Vendor
+              {text('DuukaTalk Vendor')}
             </p>
           </div>
         </div>
 
         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-          Connected
+          {text('Connected')}
         </span>
       </div>
 
@@ -2396,9 +2331,7 @@ console.log('Question audio:', {
 
         <p className="text-xs text-blue-200 mt-1 max-w-xs leading-relaxed">
           {text(
-            'Record a sale or debt in English or Luganda',
-            'Wandiika amagoba oba amabanja mu Lungereza oba Luganda'
-          )}
+            'Record a sale or debt in English or Luganda')}
         </p>
 
         <p
@@ -2416,9 +2349,7 @@ console.log('Question audio:', {
           role="status"
         >
           {text(
-            'Could not load your live database data. Please refresh and try again.',
-            'Tetusobodde kutikka data yo eya database. Ddamu orefreshing.'
-          )}
+            'Could not load your live database data. Please refresh and try again.')}
         </p>
       )}
 
@@ -2427,9 +2358,7 @@ console.log('Question audio:', {
 
         <span className="bg-white dark:bg-slate-900 px-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wider absolute">
           {text(
-            'OR WRITE',
-            'OBA WANDIIKA'
-          )}
+            'OR WRITE')}
         </span>
       </div>
 
@@ -2443,18 +2372,14 @@ console.log('Question audio:', {
 
           <span>
             {text(
-              'Type manually',
-              "Wandiika n'Engalo"
-            )}
+              'Type manually')}
           </span>
         </div>
 
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
             {text(
-              'Customer (Name or Phone)',
-              'Omuguzi (Erinnya oba Ssimu)'
-            )}
+              'Customer (Name or Phone)')}
           </label>
 
           <div className="relative">
@@ -2465,7 +2390,7 @@ console.log('Question audio:', {
 
             <input
               type="text"
-              placeholder="e.g. Nakato Grace or 0772\u2026"
+              placeholder={text('e.g. Nakato Grace or 0772\u2026')}
               value={formData.customer}
               onChange={(e) =>
                 setFormData({
@@ -2486,9 +2411,7 @@ console.log('Question audio:', {
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
             {text(
-              'Item & Quantity',
-              'Ebyaguddwa'
-            )}
+              'Item & Quantity')}
           </label>
 
           <div className="relative">
@@ -2499,7 +2422,7 @@ console.log('Question audio:', {
 
             <input
               type="text"
-              placeholder="e.g. Kasooli 2kg, Amafuta 1L"
+              placeholder={text('e.g. Kasooli 2kg, Amafuta 1L')}
               value={formData.item}
               onChange={(e) =>
                 setFormData({
@@ -2518,10 +2441,9 @@ console.log('Question audio:', {
 
         <div>
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-            { text(
-  `Total Amount (${user.currency || 'UGX'})`,
-  `Omuwendo (${user.currency || 'UGX'})`
-)}
+            {text('Total Amount ({currency})', {
+              currency: user.currency || 'UGX',
+            })}
           </label>
 
           <div className="relative">
@@ -2567,9 +2489,7 @@ console.log('Question audio:', {
 
             \ud83d\udcb5{' '}
             {text(
-              'Cash',
-              'Ensimbi'
-            )}
+              'Cash')}
           </button>
 
           <button
@@ -2590,9 +2510,7 @@ console.log('Question audio:', {
 
             \ud83d\udcd2{' '}
             {text(
-              'Credit',
-              'Omubanja'
-            )}
+              'Credit')}
           </button>
         </div>
 
@@ -2603,9 +2521,7 @@ console.log('Question audio:', {
           <CheckCircle size={16} />
 
           {text(
-            'Save Entry',
-            'Kola'
-          )}{' '}
+            'Save Entry')}{' '}
           \u2713
         </button>
 
@@ -2614,7 +2530,7 @@ console.log('Question audio:', {
             className="text-center text-xs font-medium text-emerald-600 dark:text-emerald-400"
             role="status"
           >
-            {formMessage}
+            {shown(formMessage)}
           </p>
         )}
       </form>
@@ -2689,9 +2605,7 @@ console.log('Question audio:', {
             }`}
           >
             {text(
-              'Daily',
-              'Leero'
-            )}
+              'Daily')}
           </button>
 
           <button
@@ -2706,9 +2620,7 @@ console.log('Question audio:', {
             }`}
           >
             {text(
-              'Weekly',
-              'Sabiti'
-            )}
+              'Weekly')}
           </button>
 
           <button
@@ -2723,9 +2635,7 @@ console.log('Question audio:', {
             }`}
           >
             {text(
-              'Monthly',
-              "Omwezi"
-            )}
+              'Monthly')}
           </button>
         </div>
 
@@ -2735,14 +2645,12 @@ console.log('Question audio:', {
             <div>
               <span className="text-[11px] text-blue-200 uppercase font-semibold tracking-wider">
                 {text(
-                  'Total inflows',
-                  'Ebyakolwa'
-                )}
+                  'Total inflows')}
               </span>
 
              <div className="text-2xl font-extrabold mt-0.5">
               {isLoadingData
-              ? 'Loading...'
+              ? text('Loading...')
               : formatCurrency(totalSales, user.currency)}
              </div>
 
@@ -2752,7 +2660,7 @@ console.log('Question audio:', {
                 className="mr-1"
               />
 
-              Live
+              {text('Live')}
             </span>
           </div>
 </div>
@@ -2760,14 +2668,12 @@ console.log('Question audio:', {
             <div>
               <span className="text-blue-300 text-[11px]">
                 {text(
-                  'Cash in Hand',
-                  'Ssente eziri mu ngalo'
-                )}
+                  'Cash in Hand')}
               </span>
 
               <p className="font-bold text-sm">
   {isLoadingData
-    ? 'Loading...'
+    ? text('Loading...')
     : formatCurrency(totalSales, user.currency)}
 </p>
             </div>
@@ -2775,14 +2681,12 @@ console.log('Question audio:', {
             <div>
               <span className="text-blue-300 text-[11px]">
                 {text(
-                  'Credit Given',
-                  'Amabanja agawereddwa'
-                )}
+                  'Credit Given')}
               </span>
 
               <p className="font-bold text-sm text-amber-300">
                 {isLoadingData
-                  ? 'Loading...'
+                  ? text('Loading...')
                   : formatCurrency(totalCreditOutstanding, user.currency)}
               </p>
             </div>
@@ -2799,9 +2703,7 @@ console.log('Question audio:', {
           <input
             type="text"
             placeholder={text(
-              'Search customer or item\u2026',
-              'Noonya omuguzi oba ekyaguddwa\u2026'
-            )}
+              'Search customer or item\u2026')}
             value={searchQuery}
             onChange={(e) =>
               setSearchQuery(
@@ -2819,7 +2721,7 @@ console.log('Question audio:', {
             type="button"
             onClick={handleQuestionMicClick}
             className="absolute right-3 top-2.5 text-amber-500"
-            aria-label="Ask DuukaTalk a question"
+            aria-label={text('Ask DuukaTalk a question')}
           >
              <Mic size={16} />
           </button>
@@ -2849,23 +2751,15 @@ console.log('Question audio:', {
               <span className="text-xs font-bold">
                 {isQuestionRecording
                   ? text(
-                      'Listening\u2026',
-                      'Mpulira\u2026'
-                    )
+                      'Listening\u2026')
                   : isQuestionProcessing
                     ? text(
-                        'Thinking\u2026',
-                        'Ndowooza\u2026'
-                      )
+                        'Thinking\u2026')
                     : isQuestionSpeaking
                       ? text(
-                          'Speaking\u2026',
-                          'Njogera\u2026'
-                        )
+                          'Speaking\u2026')
                       : text(
-                          'Voice Assistant',
-                          'Omuyambi w\u2019eddoboozi'
-                        )}
+                          'Voice Assistant')}
               </span>
             </div>
 
@@ -2873,9 +2767,7 @@ console.log('Question audio:', {
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-300">
                 <span className="font-semibold">
                   {text(
-                    'You:',
-                    'Ggwe:'
-                  )}
+                    'You:')}
                 </span>{' '}
                 {questionTranscript}
               </p>
@@ -2885,9 +2777,7 @@ console.log('Question audio:', {
               <p className="mt-1.5 text-xs leading-relaxed">
                 <span className="font-semibold">
                   {text(
-                    'DuukaTalk:',
-                    'DuukaTalk:'
-                  )}
+                    'DuukaTalk:')}
                 </span>{' '}
                 {questionAnswer}
               </p>
@@ -2895,7 +2785,7 @@ console.log('Question audio:', {
 
             {questionError && (
               <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                {questionError}
+                {shown(questionError)}
               </p>
             )}
           </div>
@@ -2907,16 +2797,12 @@ console.log('Question audio:', {
           <div className="flex justify-between items-center mb-2 px-1">
             <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
               {text(
-                'Transactions',
-                'Ebintu Ebyakozesebwa'
-              )}
+                'Transactions')}
             </span>
 
             <span className="text-[11px] text-slate-400">
               {text(
-                'From your database',
-                'Okuva mu database yo'
-              )}
+                'From your database')}
             </span>
           </div>
 
@@ -2929,9 +2815,7 @@ console.log('Question audio:', {
                 />
 
                 {text(
-                  'Loading your transactions...',
-                  'Tukikka transactions zo...'
-                )}
+                  'Loading your transactions...')}
               </div>
             )}
 
@@ -2953,15 +2837,15 @@ console.log('Question audio:', {
 
           <div className="min-w-0">
             <h4 className="text-xs font-bold truncate">
-              {tx.customer}
+              {shown(tx.customer)}
             </h4>
 
             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-              {tx.item}
+              {shown(tx.item)}
             </p>
 
             <p className="text-[10px] text-slate-400 mt-0.5">
-              {tx.date}
+              {whenLabel(tx.timestamp || tx.date)}
             </p>
           </div>
         </div>
@@ -2980,22 +2864,21 @@ console.log('Question audio:', {
               }`}
             >
               {tx.type === 'cash'
-                ? 'Cash'
-                : tx.dueDate || 'Credit'}
+                ? text('Cash')
+                : tx.dueDate
+                  ? dueLabel(tx.dueDate)
+                  : text('Credit')}
             </span>
 
             <button
               type="button"
               onClick={() => handleStartEdit(tx)}
               className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-300 dark:hover:bg-blue-900 transition"
-              aria-label={text(
-                `Edit transaction for ${tx.customer}`,
-                `Kyuusa ekiwandiiko kya ${tx.customer}`
-              )}
+              aria-label={text('Edit transaction for {customer}', {
+                customer: shown(tx.customer),
+              })}
               title={text(
-                'Edit transaction',
-                'Kyuusa ekiwandiiko'
-              )}
+                'Edit transaction')}
             >
               <Edit3 size={13} />
             </button>
@@ -3004,14 +2887,11 @@ console.log('Question audio:', {
               type="button"
               onClick={() => handleStartDelete(tx)}
               className="inline-flex items-center justify-center w-7 h-7 rounded-md border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400 dark:hover:bg-red-900 transition"
-              aria-label={text(
-                `Delete transaction for ${tx.customer}`,
-                `Gyawo ekiwandiiko kya ${tx.customer}`
-              )}
+              aria-label={text('Delete transaction for {customer}', {
+                customer: shown(tx.customer),
+              })}
               title={text(
-                'Delete transaction',
-                'Gyawo ekiwandiiko'
-              )}
+                'Delete transaction')}
             >
               <Trash2 size={13} />
             </button>
@@ -3049,16 +2929,12 @@ console.log('Question audio:', {
             <div>
               <h2 className="font-bold text-base">
                 {text(
-                  'Edit Transaction',
-                  'Kyuusa Ekiwandiiko'
-                )}
+                  'Edit Transaction')}
               </h2>
 
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {text(
-                  'Update the transaction details below.',
-                  'Kyuusa ebikwata ku kiwandiiko wansi.'
-                )}
+                  'Update the transaction details below.')}
               </p>
             </div>
 
@@ -3067,7 +2943,7 @@ console.log('Question audio:', {
               onClick={handleCancelEdit}
               disabled={isSavingEdit}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50"
-              aria-label="Close edit form"
+              aria-label={text('Close edit form')}
             >
               <X size={18} />
             </button>
@@ -3079,9 +2955,7 @@ console.log('Question audio:', {
             <div>
               <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
                 {text(
-                  'Customer',
-                  'Omuguzi'
-                )}
+                  'Customer')}
               </label>
 
               <div className="relative">
@@ -3115,9 +2989,7 @@ console.log('Question audio:', {
             <div>
               <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
                 {text(
-                  'Item',
-                  'Ekyaguddwa'
-                )}
+                  'Item')}
               </label>
 
               <div className="relative">
@@ -3149,15 +3021,14 @@ console.log('Question audio:', {
             {/* Amount */}
             <div>
               <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
-                {text(
-                  'Total Amount (UGX)',
-                  'Omuwendo (UGX)'
-                )}
+                {text('Total Amount ({currency})', {
+                  currency: user.currency || 'UGX',
+                })}
               </label>
 
               <div className="relative">
                 <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
-                  UGX
+                  {user.currency || 'UGX'}
                 </span>
 
                 <input
@@ -3186,9 +3057,7 @@ console.log('Question audio:', {
             <div>
               <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
                 {text(
-                  'Payment Type',
-                  'Engeri y\u2019okusasula'
-                )}
+                  'Payment Type')}
               </label>
 
               <div className="grid grid-cols-2 gap-2">
@@ -3210,9 +3079,7 @@ console.log('Question audio:', {
                 >
                   \ud83d\udcb5{' '}
                   {text(
-                    'Cash',
-                    'Ensimbi'
-                  )}
+                    'Cash')}
                 </button>
 
                 <button
@@ -3233,9 +3100,7 @@ console.log('Question audio:', {
                 >
                   \ud83d\udcd2{' '}
                   {text(
-                    'Credit',
-                    'Omubanja'
-                  )}
+                    'Credit')}
                 </button>
               </div>
             </div>
@@ -3246,9 +3111,7 @@ console.log('Question audio:', {
               <div>
                 <label className="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">
                   {text(
-                    'Due Date',
-                    'Olunaku lw\u2019okusasula'
-                  )}
+                    'Due Date')}
                 </label>
 
                 <input
@@ -3275,7 +3138,7 @@ console.log('Question audio:', {
             {/* Error */}
             {editError && (
               <div className="rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2.5 text-xs text-red-700 dark:text-red-300">
-                {editError}
+                {shown(editError)}
               </div>
             )}
 
@@ -3288,9 +3151,7 @@ console.log('Question audio:', {
                 className="py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50"
               >
                 {text(
-                  'Cancel',
-                  'Sazaamu'
-                )}
+                  'Cancel')}
               </button>
 
               <button
@@ -3307,18 +3168,14 @@ console.log('Question audio:', {
                     />
 
                     {text(
-                      'Saving...',
-                      'Ntereka...'
-                    )}
+                      'Saving...')}
                   </>
                 ) : (
                   <>
                     <Save size={15} />
 
                     {text(
-                      'Save Changes',
-                      'Tereka Enkyukakyuka'
-                    )}
+                      'Save Changes')}
                   </>
                 )}
               </button>
@@ -3357,16 +3214,12 @@ console.log('Question audio:', {
               <div>
                 <h2 className="font-bold text-base">
                   {text(
-                    'Delete Transaction?',
-                    'Gyawo Ekiwandiiko?'
-                  )}
+                    'Delete Transaction?')}
                 </h2>
 
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {text(
-                    'This action cannot be undone.',
-                    'Ekikolwa kino tekisobola kuddibwawo.'
-                  )}
+                    'This action cannot be undone.')}
                 </p>
               </div>
             </div>
@@ -3378,7 +3231,7 @@ console.log('Question audio:', {
                 isDeletingTransaction
               }
               className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition disabled:opacity-50"
-              aria-label="Close delete confirmation"
+              aria-label={text('Close delete confirmation')}
             >
               <X size={18} />
             </button>
@@ -3410,8 +3263,10 @@ console.log('Question audio:', {
 
                 <div className="text-right shrink-0">
                   <p className="text-xs font-bold">
-                    UGX{' '}
-                    {deletingTransaction.amount.toLocaleString()}
+                    {formatCurrency(
+                      deletingTransaction.amount,
+                      user.currency
+                    )}
                   </p>
 
                   <span
@@ -3424,8 +3279,8 @@ console.log('Question audio:', {
                   >
                     {deletingTransaction.type ===
                     'cash'
-                      ? 'Cash'
-                      : 'Credit'}
+                      ? text('Cash')
+                      : text('Credit')}
                   </span>
                 </div>
               </div>
@@ -3434,7 +3289,7 @@ console.log('Question audio:', {
             {/* Error */}
             {deleteError && (
               <div className="rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 px-3 py-2.5 text-xs text-red-700 dark:text-red-300 mb-4">
-                {deleteError}
+                {shown(deleteError)}
               </div>
             )}
 
@@ -3449,9 +3304,7 @@ console.log('Question audio:', {
                 className="py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50"
               >
                 {text(
-                  'Cancel',
-                  'Sazaamu'
-                )}
+                  'Cancel')}
               </button>
 
               <button
@@ -3472,18 +3325,14 @@ console.log('Question audio:', {
                     />
 
                     {text(
-                      'Deleting...',
-                      'Ngiggyawo...'
-                    )}
+                      'Deleting...')}
                   </>
                 ) : (
                   <>
                     <Trash2 size={15} />
 
                     {text(
-                      'Delete',
-                      'Gyawo'
-                    )}
+                      'Delete')}
                   </>
                 )}
               </button>
@@ -3512,15 +3361,13 @@ console.log('Question audio:', {
           <div>
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800">
               {text(
-                'Outstanding debts',
-                'Amabanja gonna agakyaliwo'
-              )}
+                'Outstanding debts')}
             </span>
 
             <div className="text-2xl font-extrabold mt-0.5">
               {isLoadingDebts
-                ? 'Loading...'
-                : `UGX ${totalDebts.toLocaleString()}`}
+                ? text('Loading...')
+                : formatCurrency(totalDebts, user.currency)}
             </div>
           </div>
 
@@ -3531,27 +3378,18 @@ console.log('Question audio:', {
         </div>
 
         <p className="text-xs mt-2 font-medium text-slate-800">
-          {text(
-            `${debts.length} customer ${
-              debts.length === 1
-                ? 'has'
-                : 'have'
-            } outstanding credit.`,
-            `${debts.length} ${
-              debts.length === 1
-                ? 'omuguzi alina'
-                : 'abaguzi balina'
-            } amabanja agakyaliwo.`
-          )}
+          {debts.length === 1
+            ? text('1 customer has outstanding credit.')
+            : text('{count} customers have outstanding credit.', {
+                count: debts.length,
+              })}
         </p>
       </div>
 
       <div className="flex justify-between items-center pt-2">
         <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
           {text(
-            'Active Debts',
-            'Amabanja agakyaliwo'
-          )}
+            'Active Debts')}
         </h3>
 
         <button
@@ -3572,15 +3410,13 @@ console.log('Question audio:', {
           <Plus size={14} />
 
           {text(
-            'Add Debt',
-            'Yongera ibanja'
-          )}
+            'Add Debt')}
         </button>
       </div>
 
       {debts
         .filter(
-          (debt) => debt.amount > 200000
+          (debt) => debt.amount > CREDIT_LIMIT
         )
         .map((debt) => (
           <div
@@ -3590,12 +3426,18 @@ console.log('Question audio:', {
           >
             <strong>
               {text(
-                'Exceeded loan limit',
-                'Omusolo gw\u2019obbanja gususse'
-              )}
+                'Exceeded loan limit')}
             </strong>
 
-            {`: ${debt.customer} has exceeded UGX 200,000 by UGX ${(debt.amount - 200000).toLocaleString()}.`}
+            {': '}
+            {text('{customer} has exceeded {limit} by {excess}.', {
+              customer: shown(debt.customer),
+              limit: formatCurrency(CREDIT_LIMIT, user.currency),
+              excess: formatCurrency(
+                debt.amount - CREDIT_LIMIT,
+                user.currency
+              ),
+            })}
           </div>
         ))}
 
@@ -3609,9 +3451,7 @@ console.log('Question audio:', {
             />
 
             {text(
-              'Loading debts...',
-              'Tukikka amabanja...'
-            )}
+              'Loading debts...')}
           </div>
         )}
 
@@ -3633,30 +3473,30 @@ console.log('Question audio:', {
 
                   <div className="min-w-0">
                     <h4 className="text-xs font-bold truncate">
-                      {debt.customer}
+                      {shown(debt.customer)}
                     </h4>
 
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-                      {debt.item}
+                      {shown(debt.item)}
                     </p>
 
                     <p className="text-[10px] text-slate-400 mt-0.5">
-                      {debt.dueDate}
+                      {dueLabel(debt.dueDate)}
                     </p>
                   </div>
                 </div>
 
                 <div className="text-right shrink-0">
                   <div className="text-xs font-extrabold text-amber-600 dark:text-amber-400">
-                    UGX{' '}
-                    {debt.amount.toLocaleString()}
+                    {formatCurrency(
+                      debt.amount,
+                      user.currency
+                    )}
                   </div>
 
                   <span className="inline-block mt-1 px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] font-semibold">
                     {text(
-                      'Credit',
-                      'Omubanja'
-                    )}
+                      'Credit')}
                   </span>
                 </div>
               </div>
@@ -3673,9 +3513,7 @@ console.log('Question audio:', {
 
               <p className="text-xs text-slate-500">
                 {text(
-                  'No outstanding debts found.',
-                  'Tewali mabanja agakyaliwo.'
-                )}
+                  'No outstanding debts found.')}
               </p>
             </div>
           )}
@@ -3748,16 +3586,12 @@ console.log('Question audio:', {
         <div className="flex justify-between items-center">
           <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
             {text(
-              'Business Insights',
-              'Ebikwata ku Dduuka'
-            )}
+              'Business Insights')}
           </h3>
 
           <span className="text-xs text-blue-600 dark:text-blue-400 font-semibold">
             {text(
-              'Live Data',
-              'Data Enkola'
-            )}
+              'Live Data')}
           </span>
         </div>
 
@@ -3802,21 +3636,16 @@ console.log('Question audio:', {
           >
             <span className="text-[11px] text-slate-500">
               {text(
-                'Cash sales',
-                'Amagoba ga cash'
-              )}
+                'Cash sales')}
             </span>
 
             <div className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
-              UGX{' '}
-              {cashSales.toLocaleString()}
+              {formatCurrency(cashSales, user.currency)}
             </div>
 
             <span className="text-[10px] text-emerald-600 font-semibold">
               {text(
-                'From your database',
-                'Okuva mu database yo'
-              )}
+                'From your database')}
             </span>
           </div>
 
@@ -3829,21 +3658,16 @@ console.log('Question audio:', {
           >
             <span className="text-[11px] text-slate-500">
               {text(
-                'Debt sales',
-                'Amabanja agawereddwa'
-              )}
+                'Debt sales')}
             </span>
 
             <div className="text-base font-extrabold text-blue-600 dark:text-blue-400 mt-1">
-              UGX{' '}
-              {debtSales.toLocaleString()}
+              {formatCurrency(debtSales, user.currency)}
             </div>
 
             <span className="text-[10px] text-blue-600 font-semibold">
               {text(
-                'From your database',
-                'Okuva mu database yo'
-              )}
+                'From your database')}
             </span>
           </div>
         </div>
@@ -3858,9 +3682,7 @@ console.log('Question audio:', {
         >
           <h4 className="mb-3 text-xs font-bold">
             {text(
-              'Savings & Loan Readiness Coach',
-              'Omuwandiisi w\u2019ensawo n\u2019ensimbi'
-            )}
+              'Savings & Loan Readiness Coach')}
           </h4>
 
           <div className="space-y-3">
@@ -3868,9 +3690,7 @@ console.log('Question audio:', {
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
                   {text(
-                    'Loan readiness score',
-                    'Omuwendo gw\u2019okukola olwanji'
-                  )}
+                    'Loan readiness score')}
                 </span>
                 <span className="rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-bold text-white">
                   {summary?.loanReadinessScore ?? 0}
@@ -3878,16 +3698,16 @@ console.log('Question audio:', {
               </div>
               <div className="mt-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
                 {text(
-                  'Recommended savings target',
-                  'Ekiri mu kuteeka ssente'
+                  'Recommended savings target')}
+                {': '}
+                {formatCurrency(
+                  summary?.recommendedSavings ?? 0,
+                  user.currency
                 )}
-                : UGX {summary?.recommendedSavings?.toLocaleString() ?? '0'}
               </div>
               <div className="mt-2 text-[11px] font-semibold text-slate-700 dark:text-slate-200">
                 {text(
-                  'Cash vs credit in shop',
-                  'Ssente eziriwo vs amabanja'
-                )}
+                  'Cash vs credit in shop')}
                 : {summary?.creditSharePercent ?? 0}%
               </div>
             </div>
@@ -3895,16 +3715,13 @@ console.log('Question audio:', {
             <div className="rounded-xl bg-blue-50 p-3 dark:bg-blue-950/30">
               <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
                 {text(
-                  'Coach advice',
-                  'Okulabula kwa coach'
-                )}
+                  'Coach advice')}
               </div>
               <p className="mt-2 text-[11px] leading-5 text-slate-600 dark:text-slate-300">
-                {summary?.loanAdvice ||
-                  text(
-                    'Keep cash at hand above credit and save a percentage of sales each week. If your shop accounts are operating well, banks can give you a loan.',
-                    'Teeka ssente eziriwo okusukka amabanja era teeka ku bigobawo buli wiiki. Oba bizinensi yo ekola bulungi, banki ziyinza okukukkiriza olwanji.'
-                  )}
+                {summary?.adviceCode
+                  ? coachAdvice(summary)
+                  : text(
+                    'Keep cash at hand above credit and save a percentage of sales each week. If your shop accounts are operating well, banks can give you a loan.')}
               </p>
             </div>
           </div>
@@ -3919,18 +3736,14 @@ console.log('Question audio:', {
         >
           <h4 className="mb-3 text-xs font-bold">
             {text(
-              'Database Activity',
-              'Ebikolwa mu Database'
-            )}
+              'Database Activity')}
           </h4>
 
           <div className="space-y-3">
             <div className="flex justify-between text-xs">
               <span className="text-slate-500">
                 {text(
-                  'Transactions recorded',
-                  'Transactions eziwandiikiddwa'
-                )}
+                  'Transactions recorded')}
               </span>
 
               <span className="font-bold">
@@ -3941,9 +3754,7 @@ console.log('Question audio:', {
             <div className="flex justify-between text-xs">
               <span className="text-slate-500">
                 {text(
-                  'Cash transactions',
-                  'Transactions za Cash'
-                )}
+                  'Cash transactions')}
               </span>
 
               <span className="font-bold">
@@ -3960,9 +3771,7 @@ console.log('Question audio:', {
             <div className="flex justify-between text-xs">
               <span className="text-slate-500">
                 {text(
-                  'Credit transactions',
-                  'Transactions za Credit'
-                )}
+                  'Credit transactions')}
               </span>
 
               <span className="font-bold">
@@ -4017,7 +3826,7 @@ console.log('Question audio:', {
       className="sr-only"
       htmlFor="language-mode"
     >
-      Language
+      {text('Language')}
     </label>
 
     <select
@@ -4051,9 +3860,7 @@ console.log('Question audio:', {
         }
         className="relative rounded-md p-1.5 text-blue-200 transition hover:bg-blue-800/80 hover:text-white"
         aria-label={text(
-          'Notifications',
-          'Obubaka'
-        )}
+          'Notifications')}
       >
         <Bell size={18} />
 
@@ -4071,9 +3878,7 @@ console.log('Question audio:', {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold">
               {text(
-                'Notifications',
-                'Obubaka'
-              )}
+                'Notifications')}
             </h2>
 
             <button
@@ -4083,9 +3888,7 @@ console.log('Question audio:', {
               }
               className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-white"
               aria-label={text(
-                'Close notifications',
-                'Ggalawo obubaka'
-              )}
+                'Close notifications')}
             >
               <X size={16} />
             </button>
@@ -4094,9 +3897,7 @@ console.log('Question audio:', {
           {notifications.length === 0 ? (
             <p className="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
               {text(
-                'No new notifications',
-                'Tewali bubaka bupya'
-              )}
+                'No new notifications')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -4135,9 +3936,7 @@ console.log('Question audio:', {
       }
       className="rounded-md p-1.5 text-blue-200 transition hover:bg-blue-800/80 hover:text-white"
       aria-label={text(
-        'Settings',
-        'Settings'
-      )}
+        'Settings')}
     >
       <Settings size={18} />
     </button>
@@ -4149,15 +3948,13 @@ console.log('Question audio:', {
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-bold">
                 {text(
-                  'Settings',
-                  'Settings'
-                )}
+                  'Settings')}
               </h2>
 
               <button
                 type="button"
                 onClick={toggleTheme}
-                aria-label="Toggle theme"
+                aria-label={text('Toggle theme')}
                 className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-700"
               >
                 {isDarkMode ? (
@@ -4178,18 +3975,14 @@ console.log('Question audio:', {
               className="mb-2 w-full rounded-lg bg-slate-100 px-3 py-2 text-left text-xs font-semibold dark:bg-slate-700"
             >
               {text(
-                'Privacy',
-                'Obukuumi'
-              )}
+                'Privacy')}
             </button>
 
             {isPrivacyOpen && (
               <div className="space-y-2">
                 <p className="text-[11px] text-slate-500">
                   {text(
-                    'Change PIN or phone number',
-                    'Kyusa PIN oba essimu'
-                  )}
+                    'Change PIN or phone number')}
                 </p>
 
                 <input
@@ -4201,7 +3994,7 @@ console.log('Question audio:', {
                         .slice(0, 4)
                     )
                   }
-                  placeholder="New 4-digit PIN"
+                  placeholder={text('New 4-digit PIN')}
                   className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs dark:border-slate-600 dark:bg-slate-900"
                   inputMode="numeric"
                 />
@@ -4213,7 +4006,7 @@ console.log('Question audio:', {
                       event.target.value
                     )
                   }
-                  placeholder="Phone number"
+                  placeholder={text('Phone number')}
                   className="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs dark:border-slate-600 dark:bg-slate-900"
                 />
 
@@ -4225,14 +4018,12 @@ console.log('Question audio:', {
                   className="w-full rounded-lg bg-blue-900 px-3 py-2 text-xs font-semibold text-white"
                 >
                   {text(
-                    'Save changes',
-                    'Tereka enkyukakyuka'
-                  )}
+                    'Save changes')}
                 </button>
 
                 {settingsMessage && (
                   <p className="text-[11px] text-emerald-600">
-                    {settingsMessage}
+                    {shown(settingsMessage)}
                   </p>
                 )}
               </div>
@@ -4246,9 +4037,7 @@ console.log('Question audio:', {
               <LogOut size={15} />
 
               {text(
-                'Log out',
-                'Fuluma'
-              )}
+                'Log out')}
             </button>
           </div>
         )}

@@ -1,14 +1,14 @@
-import { doc, setDoc } from "firebase/firestore";
 import { dispatchVendorAlertSms, resolveCustomerPhone } from "./dispatch-vendor-alerts";
-import { db } from "./firebase";
+import { getDb } from "./firebase";
+import { getVendorCurrency } from "./auth";
+import { formatDay, formatMoney } from "./money";
 import { Language, localize, parseLanguage } from "./risk-flags";
 import { sendSms } from "./sms";
 import { normalizeCustomerName } from "./credit";
 
 export async function rememberCustomerPhone(customerName: string, phone: string, vendorId?: string): Promise<void> {
   const customerKey = vendorId ? `${vendorId}_${normalizeCustomerName(customerName)}` : normalizeCustomerName(customerName);
-  await setDoc(
-    doc(db, "customers", customerKey),
+  await getDb().collection("customers").doc(customerKey).set(
     { phone, vendor_id: vendorId ?? null, customer_name: customerName.trim(), updated_at: new Date().toISOString() },
     { merge: true },
   );
@@ -39,19 +39,21 @@ export async function notifyAfterTransaction(input: {
       }
     }
 
-    const dueEn = input.dueDate && input.dueDate !== "N/A" ? ` Pay by ${input.dueDate}.` : "";
-    const dueLug = input.dueDate && input.dueDate !== "N/A" ? ` Sasula nga ${input.dueDate}.` : "";
-    const dueSw = input.dueDate && input.dueDate !== "N/A" ? ` Lipa kwa ${input.dueDate}.` : "";
-    const dueAr = input.dueDate && input.dueDate !== "N/A" ? ` ادفع بتاريخ ${input.dueDate}.` : "";
-    const dueFr = input.dueDate && input.dueDate !== "N/A" ? ` Payez avant ${input.dueDate}.` : "";
+    const currency = await getVendorCurrency(input.vendorId);
+    const due = formatDay(input.dueDate);
+    const dueEn = input.dueDate && input.dueDate !== "N/A" ? ` Pay by ${due}.` : "";
+    const dueLug = input.dueDate && input.dueDate !== "N/A" ? ` Sasula nga ${due}.` : "";
+    const dueSw = input.dueDate && input.dueDate !== "N/A" ? ` Lipa kwa ${due}.` : "";
+    const dueAr = input.dueDate && input.dueDate !== "N/A" ? ` ادفع بتاريخ ${due}.` : "";
+    const dueFr = input.dueDate && input.dueDate !== "N/A" ? ` Payez avant ${due}.` : "";
 
     const debtorMessage = localize(
       language,
-      `DuukaTalk: You owe UGX ${input.amount.toLocaleString()} for ${input.item}.${dueEn} — from your vendor.`,
-      `DuukaTalk: Olina omubanja gwa UGX ${input.amount.toLocaleString()} ku ${input.item}.${dueLug} — okuva ku katale ko.`,
-      `DuukaTalk: Una deni la UGX ${input.amount.toLocaleString()} kwa ${input.item}.${dueSw} — kutoka kwa muuzaji wako.`,
-      `DuukaTalk: أنت مدين بـ UGX ${input.amount.toLocaleString()} مقابل ${input.item}.${dueAr} — من البائع الخاص بك.`,
-      `DuukaTalk: Vous devez UGX ${input.amount.toLocaleString()} pour ${input.item}.${dueFr} — de votre vendeur.`,
+      `DuukaTalk: You owe ${formatMoney(input.amount, currency)} for ${input.item}.${dueEn} — from your vendor.`,
+      `DuukaTalk: Olina omubanja gwa ${formatMoney(input.amount, currency)} ku ${input.item}.${dueLug} — okuva ku katale ko.`,
+      `DuukaTalk: Una deni la ${formatMoney(input.amount, currency)} kwa ${input.item}.${dueSw} — kutoka kwa muuzaji wako.`,
+      `DuukaTalk: أنت مدين بـ ${formatMoney(input.amount, currency)} مقابل ${input.item}.${dueAr} — من البائع الخاص بك.`,
+      `DuukaTalk: Vous devez ${formatMoney(input.amount, currency)} pour ${input.item}.${dueFr} — de votre vendeur.`,
     );
 
     if (customerPhone) {

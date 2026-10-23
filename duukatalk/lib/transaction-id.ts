@@ -1,12 +1,10 @@
-import { doc, runTransaction } from "firebase/firestore";
-import { db } from "./firebase";
-
-const COUNTER_PATH = ["metadata", "transaction_counter"] as const;
+import { getDb } from "./firebase";
 
 export async function getNextTransactionId(): Promise<string> {
-  const counterRef = doc(db, ...COUNTER_PATH);
+  const db = getDb();
+  const counterRef = db.collection("metadata").doc("transaction_counter");
 
-  const nextNumber = await runTransaction(db, async (transaction) => {
+  const nextNumber = await db.runTransaction(async (transaction) => {
     const counterSnapshot = await transaction.get(counterRef);
     const storedNumber = Number(counterSnapshot.data()?.lastNumber) || 0;
     const next = storedNumber + 1;

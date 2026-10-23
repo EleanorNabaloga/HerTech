@@ -1,6 +1,7 @@
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { CREDIT_LIMIT, normalizeCustomerName } from "./credit";
-import { db } from "./firebase";
+import { getDb } from "./firebase";
+import { getVendorCurrency } from "./auth";
+import { formatDay, formatMoney } from "./money";
 import {
   Language,
   RiskFlag,
@@ -13,12 +14,23 @@ import { sendSms } from "./sms";
 
 const SMS_ALERTS_COLLECTION = "sms_alerts";
 
-function vendorPhone(): string | null {
+/** The vendor's own phone from signup, falling back to AT_VENDOR_PHONE. */
+async function vendorPhone(vendorId: string): Promise<string | null> {
+  try {
+    const snap = await getDb().collection("vendors").doc(vendorId).get();
+    const phone = snap.exists ? snap.data()?.phone : undefined;
+    if (typeof phone === "string" && phone.trim()) return phone.trim();
+  } catch (error) {
+    console.error("Failed to look up vendor phone:", error);
+  }
   return process.env.AT_VENDOR_PHONE?.trim() || null;
 }
 
-function firestoreAlertId(flagId: string, channel: "vendor" | "customer"): string {
-  return `${channel}_${flagId}`.replace(/[/#[\]]/g, "_").slice(0, 700);
+// Scoped per vendor: flag IDs such as "credit_john" or "shop_cash_vs_credit"
+// are not unique across shops, and sharing one record made shops overwrite
+// each other's "already sent" marker, so texts were sent again.
+function firestoreAlertId(vendorId: string, flagId: string, channel: "vendor" | "customer"): string {
+  return `${vendorId}_${channel}_${flagId}`.replace(/[/#[\]]/g, "_").slice(0, 700);
 }
 
 export async function resolveCustomerPhone(
@@ -33,8 +45,8 @@ export async function resolveCustomerPhone(
       ? `${vendorId}_${normalizeCustomerName(customerName)}`
       : normalizeCustomerName(customerName);
 
-    const customerSnap = await getDoc(doc(db, "customers", scopedCustomerKey));
-    const stored = customerSnap.exists() ? customerSnap.data().phone : undefined;
+    const customerSnap = await getDb().collection("customers").doc(scopedCustomerKey).get();
+    const stored = customerSnap.exists ? customerSnap.data()?.phone : undefined;
     if (typeof stored === "string" && stored.trim()) return stored.trim();
   } catch (error) {
     console.error("Failed to look up customer phone by scoped customer record:", error);
@@ -45,13 +57,11 @@ export async function resolveCustomerPhone(
       return process.env.AT_DEMO_CUSTOMER_PHONE?.trim() || null;
     }
 
-    const customerQuery = query(
-      collection(db, "customers"),
-      where("vendor_id", "==", vendorId),
-      where("customer_name", "==", customerName.trim()),
-    );
-
-    const customerRows = await getDocs(customerQuery);
+    const customerRows = await getDb()
+      .collection("customers")
+      .where("vendor_id", "==", vendorId)
+      .where("customer_name", "==", customerName.trim())
+      .get();
     for (const row of customerRows.docs) {
       const rowPhone = row.data().phone;
       if (typeof rowPhone === "string" && rowPhone.trim()) {
@@ -65,40 +75,53 @@ export async function resolveCustomerPhone(
   return process.env.AT_DEMO_CUSTOMER_PHONE?.trim() || null;
 }
 
-async function alreadySent(docId: string, fingerprint: string): Promise<boolean> {
-  const snap = await getDoc(doc(db, SMS_ALERTS_COLLECTION, docId));
-  if (!snap.exists()) return false;
-  return snap.data().fingerprint === fingerprint;
+/**
+ * Atomically claims an alert before sending it. Saving a sale and reloading
+ * the dashboard both start an alert sweep at the same moment; with a plain
+ * "check, send, then mark" both sweeps passed the check and each sent the
+ * text. Inside a transaction only one of them can claim it.
+ */
+async function claimAlert(
+  docId: string,
+  fingerprint: string,
+): Promise<{ claimed: boolean; previousFingerprint: string | null }> {
+  const db = getDb();
+  const ref = db.collection(SMS_ALERTS_COLLECTION).doc(docId);
+
+  return db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(ref);
+    const previous = snap.exists ? snap.data()?.fingerprint : undefined;
+    const previousFingerprint = typeof previous === "string" ? previous : null;
+
+    if (previousFingerprint === fingerprint) {
+      return { claimed: false, previousFingerprint };
+    }
+
+    transaction.set(
+      ref,
+      { fingerprint, status: "sending", claimed_at: new Date().toISOString() },
+      { merge: true },
+    );
+    return { claimed: true, previousFingerprint };
+  });
 }
 
-async function markSent(docId: string, fingerprint: string, extra: Record<string, unknown>): Promise<void> {
-  await setDoc(
-    doc(db, SMS_ALERTS_COLLECTION, docId),
-    {
-      fingerprint,
-      sent_at: new Date().toISOString(),
-      ...extra,
-    },
-    { merge: true },
-  );
-}
-
-function customerAlertMessage(flag: RiskFlag, language: Language): string | null {
+function customerAlertMessage(flag: RiskFlag, language: Language, currency: string): string | null {
   if (flag.type === "credit_risk") {
     const owed = Number(flag.details.amountOwed) || 0;
     return localize(
       language,
-      `DuukaTalk: You are over your vendor's UGX ${CREDIT_LIMIT.toLocaleString()} credit limit. You now owe UGX ${owed.toLocaleString()}. Please pay.`,
-      `DuukaTalk: Osukkiridde ekkomo ly'omubanja lya UGX ${CREDIT_LIMIT.toLocaleString()} okuva ku katale ko. Kati olina UGX ${owed.toLocaleString()}. Nsaba osasule.`,
-      `DuukaTalk: Umepita kikomo cha mkopo cha UGX ${CREDIT_LIMIT.toLocaleString()} kwa muuzaji wako. Sasa una deni la UGX ${owed.toLocaleString()}. Tafadhali lipa.`,
-      `DuukaTalk: تجاوزت الحد الائتماني الخاص بالبائع وهو UGX ${CREDIT_LIMIT.toLocaleString()}. أنت الآن مدين بـ UGX ${owed.toLocaleString()}. يرجى السداد.`,
-      `DuukaTalk: Vous avez dépassé la limite de crédit de votre vendeur de UGX ${CREDIT_LIMIT.toLocaleString()}. Vous devez maintenant UGX ${owed.toLocaleString()}. Veuillez payer.`,
+      `DuukaTalk: You are over your vendor's ${formatMoney(CREDIT_LIMIT, currency)} credit limit. You now owe ${formatMoney(owed, currency)}. Please pay.`,
+      `DuukaTalk: Osukkiridde ekkomo ly'omubanja lya ${formatMoney(CREDIT_LIMIT, currency)} okuva ku katale ko. Kati olina ${formatMoney(owed, currency)}. Nsaba osasule.`,
+      `DuukaTalk: Umepita kikomo cha mkopo cha ${formatMoney(CREDIT_LIMIT, currency)} kwa muuzaji wako. Sasa una deni la ${formatMoney(owed, currency)}. Tafadhali lipa.`,
+      `DuukaTalk: تجاوزت الحد الائتماني الخاص بالبائع وهو ${formatMoney(CREDIT_LIMIT, currency)}. أنت الآن مدين بـ ${formatMoney(owed, currency)}. يرجى السداد.`,
+      `DuukaTalk: Vous avez dépassé la limite de crédit de votre vendeur de ${formatMoney(CREDIT_LIMIT, currency)}. Vous devez maintenant ${formatMoney(owed, currency)}. Veuillez payer.`,
     );
   }
 
   if (flag.type === "due_date") {
     const item = String(flag.details.item ?? "your purchase");
-    const dueDate = String(flag.details.dueDate ?? "");
+    const dueDate = formatDay(String(flag.details.dueDate ?? ""));
     return localize(
       language,
       `DuukaTalk: Your payment for ${item} was due ${dueDate}. Please settle with your vendor.`,
@@ -119,15 +142,31 @@ async function sendOnce(options: {
   message: string;
   extra: Record<string, unknown>;
 }): Promise<boolean> {
-  if (await alreadySent(options.docId, options.fingerprint)) return false;
+  const { claimed, previousFingerprint } = await claimAlert(options.docId, options.fingerprint);
+  if (!claimed) return false;
+
+  const ref = getDb().collection(SMS_ALERTS_COLLECTION).doc(options.docId);
   const result = await sendSms(options.phone, options.message);
-  if (!result.sent) return false;
-  await markSent(options.docId, options.fingerprint, options.extra);
+
+  if (!result.sent) {
+    // Release the claim so a later sweep can retry.
+    await ref.set({ fingerprint: previousFingerprint, status: "failed" }, { merge: true });
+    return false;
+  }
+
+  await ref.set(
+    { status: "sent", sent_at: new Date().toISOString(), ...options.extra },
+    { merge: true },
+  );
   return true;
 }
 
-export async function getAlertSummary(): Promise<{ vendorAlerts: number; customerAlerts: number; flags: number }> {
-  const snapshot = await getDocs(collection(db, SMS_ALERTS_COLLECTION));
+export async function getAlertSummary(vendorId: string): Promise<{ vendorAlerts: number; customerAlerts: number; flags: number }> {
+  const snapshot = await getDb()
+    .collection(SMS_ALERTS_COLLECTION)
+    .where("vendor_id", "==", vendorId)
+    .where("status", "==", "sent")
+    .get();
   let vendorAlerts = 0;
   let customerAlerts = 0;
   const flagIds = new Set<string>();
@@ -147,23 +186,36 @@ export async function dispatchVendorAlertSms(
   transactions?: RiskTransaction[],
   vendorId?: string,
 ): Promise<{ vendorAlerts: number; customerAlerts: number; flags: number }> {
-  let rows = transactions;
-  if (!rows) {
-    if (vendorId) {
-      const queryForVendor = query(
-        collection(db, "transactions"),
-        where("vendor_id", "==", vendorId),
-      );
-      const snapshot = await getDocs(queryForVendor);
-      rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
-    } else {
-      const snapshot = await getDocs(collection(db, "transactions"));
-      rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
+  // No vendor given (the daily cron): sweep each vendor separately so one
+  // shop's flags are never mixed with another's.
+  if (!vendorId) {
+    const vendors = await getDb().collection("vendors").get();
+    const total = { vendorAlerts: 0, customerAlerts: 0, flags: 0 };
+    for (const vendor of vendors.docs) {
+      try {
+        const result = await dispatchVendorAlertSms(language, undefined, vendor.id);
+        total.vendorAlerts += result.vendorAlerts;
+        total.customerAlerts += result.customerAlerts;
+        total.flags += result.flags;
+      } catch (error) {
+        console.error(`Alert sweep failed for ${vendor.id}:`, error);
+      }
     }
+    return total;
   }
 
-  const flags = evaluateRiskFlags(rows, language);
-  const shopPhone = vendorPhone();
+  let rows = transactions;
+  if (!rows) {
+    const snapshot = await getDb()
+      .collection("transactions")
+      .where("vendor_id", "==", vendorId)
+      .get();
+    rows = snapshot.docs.map((docSnap) => docSnap.data() as RiskTransaction);
+  }
+
+  const currency = await getVendorCurrency(vendorId);
+  const flags = evaluateRiskFlags(rows, language, currency);
+  const shopPhone = await vendorPhone(vendorId);
   let vendorAlerts = 0;
   let customerAlerts = 0;
 
@@ -172,26 +224,26 @@ export async function dispatchVendorAlertSms(
 
     if (shopPhone) {
       const sent = await sendOnce({
-        docId: firestoreAlertId(flag.id, "vendor"),
+        docId: firestoreAlertId(vendorId, flag.id, "vendor"),
         fingerprint,
         phone: shopPhone,
         message: `DuukaTalk alert: ${flag.message}`,
-        extra: { channel: "vendor", flag_id: flag.id, type: flag.type },
+        extra: { channel: "vendor", vendor_id: vendorId, flag_id: flag.id, type: flag.type },
       });
       if (sent) vendorAlerts += 1;
     }
 
-    const customerMessage = customerAlertMessage(flag, language);
+    const customerMessage = customerAlertMessage(flag, language, currency);
     const customerName = flag.details.customerName;
     if (customerMessage && typeof customerName === "string" && customerName.trim()) {
       const phone = await resolveCustomerPhone(customerName, null, vendorId);
       if (phone) {
         const sent = await sendOnce({
-          docId: firestoreAlertId(flag.id, "customer"),
+          docId: firestoreAlertId(vendorId, flag.id, "customer"),
           fingerprint,
           phone,
           message: customerMessage,
-          extra: { channel: "customer", flag_id: flag.id, type: flag.type, customer: customerName },
+          extra: { channel: "customer", vendor_id: vendorId, flag_id: flag.id, type: flag.type, customer: customerName },
         });
         if (sent) customerAlerts += 1;
       }

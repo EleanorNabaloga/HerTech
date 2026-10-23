@@ -1,26 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getVendorCurrency } from "@/lib/auth";
+import { getSessionVendorId } from "@/lib/session";
+import { getDb } from "@/lib/firebase";
 import { toFirestoreTransaction } from "@/lib/firestore-transaction";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 import { getNextTransactionId } from "@/lib/transaction-id";
-import { localize, parseLanguage } from "@/lib/risk-flags";
+import { creditLimitWarning, parseLanguage } from "@/lib/risk-flags";
 import { CREDIT_LIMIT, normalizeCustomerName } from "@/lib/credit";
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
 
 export async function GET(request: NextRequest) {
   try {
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(
@@ -31,12 +23,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const transactionsQuery = query(
-      collection(db, "transactions"),
-      where("vendor_id", "==", vendorId)
-    );
-
-    const snapshot = await getDocs(transactionsQuery);
+    const snapshot = await getDb()
+      .collection("transactions")
+      .where("vendor_id", "==", vendorId)
+      .get();
 
     const transactions = snapshot.docs.map((docSnap) => ({
       ...docSnap.data(),
@@ -58,7 +48,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(
@@ -105,11 +95,13 @@ export async function POST(request: NextRequest) {
     const language = parseLanguage(body.language);
 
     if (paymentType === "credit") {
-      const customerRef = doc(db, "customers", customerKey);
-      const customerSnap = await getDoc(customerRef);
+      const customerSnap = await getDb()
+        .collection("customers")
+        .doc(customerKey)
+        .get();
 
-      const outstandingCredit = customerSnap.exists()
-        ? Number(customerSnap.data().outstanding_credit || 0)
+      const outstandingCredit = customerSnap.exists
+        ? Number(customerSnap.data()?.outstanding_credit || 0)
         : 0;
 
       if (
@@ -118,10 +110,11 @@ export async function POST(request: NextRequest) {
       ) {
         return NextResponse.json(
           {
-            error: localize(
+            error: creditLimitWarning(
               language,
-              `Warning: ${customer} already has UGX ${outstandingCredit.toLocaleString()} in outstanding credit, above the UGX ${CREDIT_LIMIT.toLocaleString()} limit. Pause new lending and recover cash first. Use the tick to accept the warning and record, or use the cross to refuse.`,
-              `Okulabula: ${customer} alina amabanja agasigadde UGX ${outstandingCredit.toLocaleString()}, okusukka ku kkomo lya UGX ${CREDIT_LIMIT.toLocaleString()}. Lekeka okukuza obulava obupya era funya ssente. Kozesa akatikkulu okukkiriza okulabula n'okuwandiika, oba akamukiye okugaana.`,
+              customer,
+              outstandingCredit,
+              await getVendorCurrency(vendorId),
             ),
           },
           { status: 409 }
@@ -132,11 +125,9 @@ export async function POST(request: NextRequest) {
     const transactionId = await getNextTransactionId();
     const timestamp = new Date().toISOString();
 
-    const transactionRef = doc(
-      db,
-      "transactions",
-      transactionId
-    );
+    const transactionRef = getDb()
+      .collection("transactions")
+      .doc(transactionId);
 
     const firestoreTransaction = toFirestoreTransaction(
       {
@@ -158,7 +149,7 @@ export async function POST(request: NextRequest) {
       vendorId
     );
 
-    await setDoc(transactionRef, firestoreTransaction);
+    await transactionRef.set(firestoreTransaction);
 
     let outstandingCredit: number | undefined;
 

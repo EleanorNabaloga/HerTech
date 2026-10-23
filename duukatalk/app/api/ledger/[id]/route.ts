@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  deleteDoc,
-  doc,
-  getDoc,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getSessionVendorId } from "@/lib/session";
+import { getDb } from "@/lib/firebase";
+import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 
-const AUTH_COOKIE_NAME = "duukatalk_vendor_id";
+/** Recalculate saved balances for the customers an edit/delete touched. */
+async function refreshBalances(vendorId: string, names: unknown[]) {
+  const unique = new Set(
+    names.filter((n): n is string => typeof n === "string" && n.trim() !== "")
+  );
+  for (const name of unique) {
+    try {
+      await updateCustomerCredit(vendorId, name);
+    } catch (error) {
+      console.error("Failed to refresh customer balance:", error);
+    }
+  }
+}
+
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -19,7 +28,7 @@ export async function PUT(
 ) {
   try {
     // Get the logged-in vendor from the authentication cookie
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(
@@ -39,10 +48,10 @@ export async function PUT(
     }
 
     // Get the transaction from Firestore
-    const transactionRef = doc(db, "transactions", id);
-    const transactionSnapshot = await getDoc(transactionRef);
+    const transactionRef = getDb().collection("transactions").doc(id);
+    const transactionSnapshot = await transactionRef.get();
 
-    if (!transactionSnapshot.exists()) {
+    if (!transactionSnapshot.exists) {
       return NextResponse.json(
         { error: "Transaction not found" },
         { status: 404 }
@@ -52,7 +61,7 @@ export async function PUT(
     const existingTransaction = transactionSnapshot.data();
 
     // Make sure this transaction belongs to the logged-in vendor
-    if (existingTransaction.vendor_id !== vendorId) {
+    if (existingTransaction?.vendor_id !== vendorId) {
       return NextResponse.json(
         { error: "Transaction not found" },
         { status: 404 }
@@ -155,7 +164,11 @@ export async function PUT(
         customerName.trim() === "" || item.trim() === "",
     };
 
-    await updateDoc(transactionRef, updates);
+    await transactionRef.update(updates);
+    await refreshBalances(vendorId, [
+      existingTransaction?.customer_name,
+      updates.customer_name,
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -178,7 +191,7 @@ export async function DELETE(
 ) {
   try {
     // Get the logged-in vendor from the authentication cookie
-    const vendorId = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const vendorId = getSessionVendorId(request);
 
     if (!vendorId) {
       return NextResponse.json(
@@ -198,10 +211,10 @@ export async function DELETE(
     }
 
     // Get the transaction from Firestore first
-    const transactionRef = doc(db, "transactions", id);
-    const transactionSnapshot = await getDoc(transactionRef);
+    const transactionRef = getDb().collection("transactions").doc(id);
+    const transactionSnapshot = await transactionRef.get();
 
-    if (!transactionSnapshot.exists()) {
+    if (!transactionSnapshot.exists) {
       return NextResponse.json(
         { error: "Transaction not found" },
         { status: 404 }
@@ -211,7 +224,7 @@ export async function DELETE(
     const existingTransaction = transactionSnapshot.data();
 
     // Make sure this transaction belongs to the logged-in vendor
-    if (existingTransaction.vendor_id !== vendorId) {
+    if (existingTransaction?.vendor_id !== vendorId) {
       return NextResponse.json(
         { error: "Transaction not found" },
         { status: 404 }
@@ -219,7 +232,8 @@ export async function DELETE(
     }
 
     // Delete the transaction
-    await deleteDoc(transactionRef);
+    await transactionRef.delete();
+    await refreshBalances(vendorId, [existingTransaction?.customer_name]);
 
     return NextResponse.json({
       success: true,
