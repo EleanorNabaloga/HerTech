@@ -1127,7 +1127,6 @@
     "AR": "تسجيل الخروج",
     "FR": "Se déconnecter"
   },
-
   "Record": {
     "LUG": "Wandiika",
     "SW": "Rekodi",
@@ -1481,5 +1480,137 @@
     "SW": "Marekani",
     "AR": "الولايات المتحدة",
     "FR": "États-Unis"
+  },
+  "Saved on this phone. It will be sent automatically when you are back online.": {
+    "LUG": "Kiterekeddwa ku ssimu eno. Kijja kusindikibwa ku lwakyo intaneti bw'eneedda.",
+    "SW": "Imehifadhiwa kwenye simu hii. Itatumwa yenyewe mtandao ukirudi.",
+    "AR": "حُفظ على هذا الهاتف. سيُرسل تلقائيًا عند عودة الاتصال.",
+    "FR": "Enregistré sur ce téléphone. Envoi automatique dès le retour de la connexion."
+  },
+  "Recording saved on this phone. It will be sent automatically when you are back online.": {
+    "LUG": "Eddoboozi literekeddwa ku ssimu eno. Lijja kusindikibwa ku lwalyo intaneti bw'eneedda.",
+    "SW": "Rekodi imehifadhiwa kwenye simu hii. Itatumwa yenyewe mtandao ukirudi.",
+    "AR": "حُفظ التسجيل على هذا الهاتف. سيُرسل تلقائيًا عند عودة الاتصال.",
+    "FR": "Enregistrement gardé sur ce téléphone. Envoi automatique dès le retour de la connexion."
+  },
+  "Offline · {count} waiting": {
+    "LUG": "Tewali intaneti · {count} birindiridde",
+    "SW": "Nje ya mtandao · {count} zinasubiri",
+    "AR": "غير متصل · {count} بالانتظار",
+    "FR": "Hors ligne · {count} en attente"
+  },
+  "Offline": {
+    "LUG": "Tewali intaneti",
+    "SW": "Nje ya mtandao",
+    "AR": "غير متصل",
+    "FR": "Hors ligne"
+  },
+  "Sending…": {
+    "LUG": "Kisindikibwa…",
+    "SW": "Inatuma…",
+    "AR": "جارٍ الإرسال…",
+    "FR": "Envoi…"
+  },
+  "{count} waiting to send": {
+    "LUG": "{count} birindiridde okusindikibwa",
+    "SW": "{count} zinasubiri kutumwa",
+    "AR": "{count} بانتظار الإرسال",
+    "FR": "{count} en attente d'envoi"
+  },
+  "All sent": {
+    "LUG": "Byonna bisindikiddwa",
+    "SW": "Zote zimetumwa",
+    "AR": "تم إرسال الكل",
+    "FR": "Tout est envoyé"
+  },
+  "You're offline. Showing data saved at {time}.": {
+    "LUG": "Tolina intaneti. Olaba ebyaterekebwa ku {time}.",
+    "SW": "Uko nje ya mtandao. Unaona data iliyohifadhiwa {time}.",
+    "AR": "أنت غير متصل. تُعرض البيانات المحفوظة في {time}.",
+    "FR": "Vous êtes hors ligne. Données enregistrées le {time}."
+  },
+  "Log in again to send your waiting entries. They are safe on this phone.": {
+    "LUG": "Ddamu oyingire okusindika ebirindiridde. Biri bulungi ku ssimu eno.",
+    "SW": "Ingia tena ili kutuma rekodi zinazosubiri. Ziko salama kwenye simu hii.",
+    "AR": "سجّل الدخول مرة أخرى لإرسال القيود المنتظرة. إنها محفوظة بأمان على هذا الهاتف.",
+    "FR": "Reconnectez-vous pour envoyer les entrées en attente. Elles sont en sécurité sur ce téléphone."
+  },
+  "Voice note": {
+    "LUG": "Eddoboozi",
+    "SW": "Rekodi ya sauti",
+    "AR": "ملاحظة صوتية",
+    "FR": "Note vocale"
+  },
+  "Waiting to send": {
+    "LUG": "Kirindiridde okusindikibwa",
+    "SW": "Inasubiri kutumwa",
+    "AR": "بانتظار الإرسال",
+    "FR": "En attente d'envoi"
+  },
+  "Some entries need your attention: {count}. See the Ledgers tab.": {
+    "LUG": "Ebiwandiiko ebimu byetaaga okubirabako: {count}. Laba ku Bitabo.",
+    "SW": "Baadhi ya rekodi zinahitaji uangalizi wako: {count}. Angalia kwenye Madaftari.",
+    "AR": "بعض القيود تحتاج إلى انتباهك: {count}. راجع تبويب الدفاتر.",
+    "FR": "Certaines entrées demandent votre attention : {count}. Voir l'onglet Registres."
+  },
+  "Not recorded.": {
+    "LUG": "Tekiwandiikiddwa.",
+    "SW": "Haijarekodiwa.",
+    "AR": "لم يُسجَّل.",
+    "FR": "Non enregistré."
+  },
+  "Don't record": {
+    "LUG": "Towandiika",
+    "SW": "Usirekodi",
+    "AR": "لا تسجّل",
+    "FR": "Ne pas enregistrer"
+  },
+  "Record anyway": {
+    "LUG": "Wandiika wadde kiri kityo",
+    "SW": "Rekodi hata hivyo",
+    "AR": "سجّل على أي حال",
+    "FR": "Enregistrer quand même"
+  },
+  "Couldn't understand this recording": {
+    "LUG": "Eddoboozi lino terityegeerekese",
+    "SW": "Rekodi hii haikueleweka",
+    "AR": "تعذّر فهم هذا التسجيل",
+    "FR": "Enregistrement incompris"
+  },
+  "Couldn't be saved: {reason}": {
+    "LUG": "Tekisobodde kuterekebwa: {reason}",
+    "SW": "Haikuweza kuhifadhiwa: {reason}",
+    "AR": "تعذّر الحفظ: {reason}",
+    "FR": "Enregistrement impossible : {reason}"
+  },
+  "Play": {
+    "LUG": "Wuliriza",
+    "SW": "Cheza",
+    "AR": "تشغيل",
+    "FR": "Écouter"
+  },
+  "Try again": {
+    "LUG": "Ddamu ogezeeko",
+    "SW": "Jaribu tena",
+    "AR": "أعد المحاولة",
+    "FR": "Réessayer"
+  },
+  "Remove this entry from the phone? This cannot be undone.": {
+    "LUG": "Ggyawo ekiwandiiko kino ku ssimu? Kino tekisobola kuddizibwa.",
+    "SW": "Ondoa rekodi hii kwenye simu? Hili haliwezi kutenduliwa.",
+    "AR": "إزالة هذا القيد من الهاتف؟ لا يمكن التراجع عن ذلك.",
+    "FR": "Retirer cette entrée du téléphone ? Action irréversible."
+  },
+  "Remove": {
+    "LUG": "Ggyawo",
+    "SW": "Ondoa",
+    "AR": "إزالة",
+    "FR": "Retirer"
+  },
+  "This entry belongs to another shop. Log in as that shop to send it.": {
+    "LUG": "Ekiwandiiko kino kya dduuka ddala. Yingira nga edduuka eryo okukisindika.",
+    "SW": "Rekodi hii ni ya duka jingine. Ingia kama duka hilo ili kuituma.",
+    "AR": "هذا القيد يخص متجرًا آخر. سجّل الدخول بحساب ذلك المتجر لإرساله.",
+    "FR": "Cette entrée appartient à une autre boutique. Connectez-vous avec celle-ci pour l'envoyer."
   }
 }

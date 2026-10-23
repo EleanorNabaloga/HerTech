@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getVendorCurrency } from "@/lib/auth";
 import { getSessionVendorId } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
-import { toFirestoreTransaction } from "@/lib/firestore-transaction";
+import {
+  VENDOR_MISMATCH_ERROR,
+  findByClientId,
+  parseClientId,
+  parseRecordedAt,
+  toFirestoreTransaction,
+  vendorMismatch,
+} from "@/lib/firestore-transaction";
 import { notifyAfterTransaction } from "@/lib/notify-transaction";
 import { updateCustomerCredit } from "@/lib/updateCustomerCredit";
 import { getNextTransactionId } from "@/lib/transaction-id";
@@ -71,7 +78,30 @@ export async function POST(request: NextRequest) {
       phone?: string | null;
       language?: string;
       acknowledgedWarning?: boolean;
+      clientId?: string;
+      expectedVendorId?: string;
+      recordedAt?: string;
     };
+
+    if (vendorMismatch(body.expectedVendorId, vendorId)) {
+      return NextResponse.json(
+        { error: VENDOR_MISMATCH_ERROR },
+        { status: 403 }
+      );
+    }
+
+    // Offline entries carry the phone's id for them. If this one was
+    // already saved (a retry after a dropped connection), return it.
+    const clientId = parseClientId(body.clientId);
+    if (clientId) {
+      const existing = await findByClientId(vendorId, clientId);
+      if (existing) {
+        return NextResponse.json(
+          { id: existing.id, transaction: existing, duplicate: true },
+          { status: 200 }
+        );
+      }
+    }
 
     const customer = (body.customer ?? body.customer_name)?.trim();
     const customerKey = `${vendorId}_${normalizeCustomerName(customer)}`;
@@ -123,7 +153,8 @@ export async function POST(request: NextRequest) {
     }
 
     const transactionId = await getNextTransactionId();
-    const timestamp = new Date().toISOString();
+    const timestamp =
+      parseRecordedAt(body.recordedAt) ?? new Date().toISOString();
 
     const transactionRef = getDb()
       .collection("transactions")
@@ -149,7 +180,7 @@ export async function POST(request: NextRequest) {
       vendorId
     );
 
-    await transactionRef.set(firestoreTransaction);
+    await transactionRef.set({ ...firestoreTransaction, client_id: clientId });
 
     let outstandingCredit: number | undefined;
 
